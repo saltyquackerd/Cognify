@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import InputField from './InputField';
 
 interface Message {
@@ -15,10 +15,10 @@ interface SidePopupProps {
   onClose: () => void;
   initialMessage: string;
   title: string;
-  position: { x: number; y: number };
+  onWidthChange?: (width: number) => void;
 }
 
-export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", position }: SidePopupProps) {
+export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange }: SidePopupProps) {
   const [messages, setMessages] = useState<Message[]>(() => {
     if (initialMessage) {
       return [{
@@ -31,11 +31,58 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     return [];
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [width, setWidth] = useState(400);
-  const [height, setHeight] = useState(500);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [width, setWidth] = useState(384); // w-96 = 384px
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const newWidth = window.innerWidth - e.clientX;
+    const minWidth = 270;
+    const maxWidth = window.innerWidth * 0.8;
+    
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+      setWidth(newWidth);
+    } else if (newWidth > maxWidth) {
+      // Snap to fullscreen when dragged beyond maximum width
+      setIsFullscreen(true);
+      setIsResizing(false);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsResizing(false);
+  };
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  // Notify parent of width changes
+  useEffect(() => {
+    if (onWidthChange) {
+      onWidthChange(width);
+    }
+  }, [width, onWidthChange]);
 
   const handleSendMessage = async (content: string) => {
     const userMessage: Message = {
@@ -52,7 +99,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     setTimeout(() => {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "This is a follow-up response in the side popup. I can help you explore this topic further!",
+        content: "This is a follow-up response in the side panel. I can help you explore this topic further!",
         role: 'assistant',
         timestamp: new Date(),
       };
@@ -61,159 +108,169 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     }, 1000);
   };
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setIsResizing(true);
-    e.preventDefault();
-  }, []);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing || isFullscreen) return;
-    
-    const newWidth = Math.max(300, Math.min(600, e.clientX - position.x));
-    const newHeight = Math.max(300, Math.min(window.innerHeight - position.y - 20, e.clientY - position.y));
-    setWidth(newWidth);
-    setHeight(newHeight);
-  }, [isResizing, isFullscreen, position]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-  };
-
-  // Add event listeners for resize
-  React.useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'ew-resize';
-      document.body.style.userSelect = 'none';
-    } else {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
   if (!isOpen) return null;
+
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {title} - Fullscreen
+          </h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={toggleFullscreen}
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              title="Exit fullscreen"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${
+                message.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}
+            >
+              <div
+                className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                  message.role === 'user'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                }`}
+              >
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                  {message.content}
+                </p>
+              </div>
+            </div>
+          ))}
+          
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-3">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input Field */}
+        <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+          <InputField
+            onSendMessage={handleSendMessage}
+            disabled={isLoading}
+            placeholder={width < 390 ? "Continue..." : "Continue conversation..."}
+            showInstructions={false}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
       ref={resizeRef}
-      className={`fixed bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl rounded-lg z-50 transition-all duration-300 ${
-        isFullscreen 
-          ? 'inset-4' 
-          : `transform ${isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`
-      }`}
-      style={isFullscreen ? {} : { 
-        left: `${position.x}px`, 
-        top: `${position.y}px`, 
-        width: `${width}px`, 
-        height: `${height}px` 
-      }}
+      className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full flex-shrink-0 relative"
+      style={{ width: `${width}px` }}
     >
-        {/* Resize Handle - Bottom Right Corner */}
-        {!isFullscreen && (
+      {/* Resize Handle */}
+      <div
+        className="absolute left-0 top-0 w-1 h-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-500 cursor-col-resize z-10 opacity-30 hover:opacity-100 transition-opacity duration-200"
+        onMouseDown={handleMouseDown}
+      />
+      
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {title}
+        </h2>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={toggleFullscreen}
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            title="Fullscreen"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
           <div
-            className="absolute bottom-0 right-0 w-4 h-4 cursor-nw-resize hover:bg-blue-500 transition-colors bg-gray-300 dark:bg-gray-600 rounded-tl-lg"
-            onMouseDown={handleMouseDown}
-          />
-        )}
-        
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {title}
-            </h2>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={toggleFullscreen}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                title={isFullscreen ? "Exit fullscreen" : "Expand to fullscreen"}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  {isFullscreen ? (
-                    <path d="M8 3V5H4V9H2V3H8ZM2 15V21H8V19H4V15H2ZM22 9V3H16V5H20V9H22ZM22 15V21H16V19H20V15H22Z" fill="currentColor"/>
-                  ) : (
-                    <path d="M7 14H5V19H10V17H7V14ZM5 10H7V7H10V5H5V10ZM17 17H14V19H19V14H17V17ZM14 5V7H17V10H19V5H14Z" fill="currentColor"/>
-                  )}
-                </svg>
-              </button>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
+            key={message.id}
+            className={`flex ${
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            <div
+              className={`max-w-[80%] rounded-2xl px-3 py-2 ${
+                message.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+              }`}
+            >
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {message.content}
+              </p>
             </div>
           </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
-                  <span className="text-white font-bold">C</span>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Start a focused conversation here
-                </p>
+        ))}
+        
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-3 py-2">
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
-            ) : (
-              <>
-                {messages.map((message) => (
-                  <div key={message.id} className="mb-4">
-                    <div className={`text-xs font-medium mb-1 ${
-                      message.role === 'user' 
-                        ? 'text-blue-600 dark:text-blue-400' 
-                        : 'text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {message.role === 'user' ? 'You' : 'Cognify'}
-                    </div>
-                    <div className="text-sm text-gray-900 dark:text-white leading-relaxed whitespace-pre-wrap">
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-                
-                {isLoading && (
-                  <div className="mb-4">
-                    <div className="text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
-                      Cognify
-                    </div>
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+            </div>
           </div>
+        )}
+      </div>
 
-          {/* Input */}
-          <div className="border-t border-gray-200 dark:border-gray-700 p-2">
-            <InputField
-              onSendMessage={handleSendMessage}
-              disabled={isLoading}
-              placeholder="Continue the conversation..."
-            />
-          </div>
-        </div>
+      {/* Input Field */}
+      <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+        <InputField
+          onSendMessage={handleSendMessage}
+          disabled={isLoading}
+          placeholder={width < 390 ? "Continue..." : "Continue conversation..."}
+          showInstructions={false}
+        />
+      </div>
     </div>
   );
 }

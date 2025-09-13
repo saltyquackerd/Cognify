@@ -6,12 +6,16 @@ interface InputFieldProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  sidePopupOpen?: boolean;
+  showInstructions?: boolean;
 }
 
 const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({ 
   onSendMessage, 
   disabled = false, 
-  placeholder = "Message ChatGPT..." 
+  placeholder = "Message ChatGPT...",
+  sidePopupOpen = false,
+  showInstructions = true
 }, ref) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -47,7 +51,7 @@ const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
+    <div className={`w-full p-4 ${sidePopupOpen ? 'max-w-2xl' : 'pr-16'}`}>
       <div className="relative flex items-end bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-200">
       <textarea
         ref={inputRef}
@@ -90,9 +94,11 @@ const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({
       </div>
       
       {/* Helper text */}
-      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-        Press Enter to send, Shift + Enter for new line
-      </div>
+      {showInstructions && (
+        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+          Press Enter to send, Shift + Enter for new line
+        </div>
+      )}
     </div>
   );
 });

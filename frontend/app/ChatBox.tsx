@@ -13,7 +13,11 @@ interface Message {
   conversationId: string;
 }
 
-export default function ChatBox() {
+interface ChatBoxProps {
+  sidePopupWidth?: number;
+}
+
+export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   const { 
     selectedConversation, 
     selectedConversationId, 
@@ -56,7 +60,9 @@ export default function ChatBox() {
   }, [currentMessages, isLoading]);
   const [sidePopupOpen, setSidePopupOpen] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
-  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
+  const [currentSidePopupWidth, setCurrentSidePopupWidth] = useState(384);
+  
+  console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
 
   const handleSendMessage = async (content: string) => {
     if (!selectedConversationId) return;
@@ -88,12 +94,8 @@ export default function ChatBox() {
     }, 1000);
   };
 
-  const handleOpenSidePopup = (message: string, event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    setPopupPosition({ 
-      x: rect.right + 8, 
-      y: rect.top 
-    });
+  const handleOpenSidePopup = (message: string) => {
+    console.log('Opening side popup with message:', message);
     setPopupMessage(message);
     setSidePopupOpen(true);
   };
@@ -104,12 +106,12 @@ export default function ChatBox() {
   };
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Main Chat Area */}
-      <div className="h-full flex flex-col">
+    <div className={`flex-1 flex bg-gray-50 dark:bg-gray-900 ${sidePopupOpen ? 'flex' : 'flex'}`}>
+      {/* Main Chat Area - Compressed */}
+      <div className={`flex flex-col min-w-0 ${sidePopupOpen ? 'flex-1' : 'flex-1'}`}>
         {/* Header */}
         <header className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className={`px-4 py-4 ${sidePopupOpen ? 'max-w-2xl ml-16' : 'w-full px-16'}`} style={sidePopupOpen ? { maxWidth: `${Math.max(400, window.innerWidth - currentSidePopupWidth - 100)}px` } : {}}>
           <div className="flex items-center justify-between">
             <div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -135,7 +137,7 @@ export default function ChatBox() {
 
         {/* Chat Content */}
         <main className="flex-1 overflow-hidden">
-          <div className="h-full max-w-4xl mx-auto flex flex-col">
+            <div className={`h-full flex flex-col ${sidePopupOpen ? 'max-w-2xl ml-16' : 'w-full px-16'}`} style={sidePopupOpen ? { maxWidth: `${Math.max(400, window.innerWidth - currentSidePopupWidth - 100)}px` } : {}}>
             {/* Messages Container */}
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
             {currentMessages.length === 0 ? (
@@ -174,7 +176,7 @@ export default function ChatBox() {
                       {/* Side Popup Trigger Button - Only for assistant messages */}
                       {message.role === 'assistant' && (
                         <button
-                          onClick={(e) => handleOpenSidePopup(message.content, e)}
+                          onClick={() => handleOpenSidePopup(message.content)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                           title="Continue this conversation in side panel"
                         >
@@ -205,26 +207,27 @@ export default function ChatBox() {
           </div>
 
           {/* Input Field at Bottom */}
-          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-transparent">
             <InputField
               ref={inputRef}
               onSendMessage={handleSendMessage}
               disabled={isLoading}
               placeholder="Message Cognify..."
+              sidePopupOpen={sidePopupOpen}
             />
             </div>
           </div>
         </main>
       </div>
 
-      {/* Side Popup */}
+      {/* Side Popup - Only render when open */}
       {sidePopupOpen && (
         <SidePopup
-          isOpen={sidePopupOpen}
+          isOpen={true}
           onClose={handleCloseSidePopup}
           initialMessage={popupMessage}
           title="Continue Chat"
-          position={popupPosition}
+          onWidthChange={setCurrentSidePopupWidth}
         />
       )}
     </div>
