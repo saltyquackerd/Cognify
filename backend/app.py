@@ -35,17 +35,18 @@ def chat():
             user_sessions[session_id] = {
                 'created_at': datetime.now().isoformat(),
                 'messages': [],
-                'quizzes': []
+                'quizzes': [],
+                'conversation_history': []  # Store in LLM-ready format
             }
         
-        # Build conversation history for context
-        conversation_history = []
-        for msg in user_sessions[session_id]['messages']:
-            conversation_history.append({"role": "user", "content": msg['user_message']})
-            conversation_history.append({"role": "assistant", "content": msg['chat_response']})
+        # Add user message to conversation history
+        user_sessions[session_id]['conversation_history'].append({"role": "user", "content": user_message})
         
         # Get response from Cerebras with conversation context
-        chat_response = llm_service.get_chat_response(user_message, conversation_history)
+        chat_response = llm_service.get_chat_response("", user_sessions[session_id]['conversation_history'])
+        
+        # Add AI response to conversation history
+        user_sessions[session_id]['conversation_history'].append({"role": "assistant", "content": chat_response})
         
         # Store the conversation
         message_id = str(uuid.uuid4())
@@ -102,19 +103,10 @@ def create_quiz_thread():
             'completed': False,
             'score': None,
             'conversation_history': [
-                {
-                    'type': 'original_question',
-                    'content': target_message['user_message']
-                },
-                {
-                    'type': 'original_response',
-                    'content': target_message['chat_response']
-                },
-                {
-                    'type': 'quiz_questions',
-                    'content': quiz_questions
-                }
-            ]  # Track complete quiz thread conversation
+                {"role": "user", "content": target_message['user_message']},
+                {"role": "assistant", "content": target_message['chat_response']},
+                {"role": "assistant", "content": f"Quiz Questions:\n" + "\n".join([f"Q{i+1}: {q['question']}" for i, q in enumerate(quiz_questions)])}
+            ]  # Track complete quiz thread conversation in LLM-ready format
         }
         
         user_sessions[session_id]['quizzes'].append(quiz_id)
@@ -170,13 +162,10 @@ def submit_quiz_answer(quiz_id):
         )
         
         # Store the answer and judgment in quiz conversation history
-        answer_entry = {
-            'type': 'user_answer',
-            'content': user_answer,
-            'judgment': judgment
-        }
-        
-        quiz['conversation_history'].append(answer_entry)
+        quiz['conversation_history'].extend([
+            {"role": "user", "content": user_answer},
+            {"role": "assistant", "content": f"Score: {judgment['score']}/100\nFeedback: {judgment['feedback']}"}
+        ])
         
         # Update quiz completion status
         quiz['completed'] = True
@@ -208,38 +197,14 @@ def continue_quiz_conversation(quiz_id):
         
         quiz = quiz_data[quiz_id]
         
-        # Build conversation history for the quiz thread
-        conversation_history = []
-        for entry in quiz['conversation_history']:
-            if entry['type'] == 'original_question':
-                conversation_history.append({"role": "user", "content": entry['content']})
-            elif entry['type'] == 'original_response':
-                conversation_history.append({"role": "assistant", "content": entry['content']})
-            elif entry['type'] == 'quiz_questions':
-                # Include quiz questions as context
-                questions_text = "\n".join([f"Q{i+1}: {q['question']}" for i, q in enumerate(entry['content'])])
-                conversation_history.append({"role": "assistant", "content": f"Quiz Questions:\n{questions_text}"})
-            elif entry['type'] == 'user_answer':
-                conversation_history.append({"role": "user", "content": entry['content']})
-                conversation_history.append({"role": "assistant", "content": f"Score: {entry['judgment']['score']}/100\nFeedback: {entry['judgment']['feedback']}"})
-            elif entry['type'] == 'follow_up':
-                conversation_history.append({"role": "user", "content": entry['user_message']})
-                conversation_history.append({"role": "assistant", "content": entry['ai_response']})
+        # Add current message to conversation history
+        quiz['conversation_history'].append({"role": "user", "content": user_message})
         
-        # Add current message
-        conversation_history.append({"role": "user", "content": user_message})
+        # Get AI response using the conversation history directly
+        ai_response = llm_service.get_chat_response("", quiz['conversation_history'])
         
-        # Get AI response
-        ai_response = llm_service.get_chat_response("", conversation_history)
-        
-        # Store the conversation
-        conversation_entry = {
-            'type': 'follow_up',
-            'user_message': user_message,
-            'ai_response': ai_response
-        }
-        
-        quiz['conversation_history'].append(conversation_entry)
+        # Store the AI response
+        quiz['conversation_history'].append({"role": "assistant", "content": ai_response})
         
         return jsonify({
             'quiz_id': quiz_id,
