@@ -16,8 +16,91 @@ CORS(app)
 llm_service = LLM()
 
 # In-memory storage for demo purposes (use a database in production)
-user_sessions = {}
-quiz_data = {}
+# Data structure: users -> sessions -> quizzes
+users = {}  # user_id -> user_data
+sessions = {}  # session_id -> session_data  
+quizzes = {}  # quiz_id -> quizzes
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    """Create a new user"""
+    try:
+        data = request.get_json()
+        username = data.get('username', '')
+        
+        if not username:
+            return jsonify({'error': 'Username is required'}), 400
+        
+        # Check if username already exists
+        for user_id, user_data in users.items():
+            if user_data.get('username') == username:
+                return jsonify({'error': 'Username already exists'}), 409
+        
+        # Create new user
+        user_id = str(uuid.uuid4())
+        users[user_id] = {
+            'id': user_id,
+            'username': username,
+            'created_at': datetime.now().isoformat(),
+            'sessions': []
+        }
+        
+        return jsonify({
+            'user_id': user_id,
+            'username': username,
+            'created_at': users[user_id]['created_at']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<user_id>', methods=['GET'])
+def get_user(user_id):
+    """Get user information"""
+    try:
+        if user_id not in users:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user = users[user_id]
+        return jsonify({
+            'user_id': user_id,
+            'username': user['username'],
+            'created_at': user['created_at'],
+            'session_count': len(user['sessions'])
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<user_id>/sessions', methods=['POST'])
+def create_session(user_id):
+    """Create a new chat session for a user"""
+    try:
+        if user_id not in users:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Create new session
+        session_id = str(uuid.uuid4())
+        sessions[session_id] = {
+            'id': session_id,
+            'user_id': user_id,
+            'created_at': datetime.now().isoformat(),
+            'messages': [],
+            'quizzes': [],
+            'conversation_history': []
+        }
+        
+        # Add session to user
+        users[user_id]['sessions'].append(session_id)
+        
+        return jsonify({
+            'session_id': session_id,
+            'user_id': user_id,
+            'created_at': sessions[session_id]['created_at']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -25,40 +108,40 @@ def chat():
     try:
         data = request.get_json()
         user_message = data.get('message', '')
-        session_id = data.get('session_id', str(uuid.uuid4()))
+        session_id = data.get('session_id', '')
         
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
-        # Initialize session if new
-        if session_id not in user_sessions:
-            user_sessions[session_id] = {
-                'messages': [],
-                'quizzes': [],
-                'conversation_history': []  # Store in LLM-ready format
-            }
+        if not session_id:
+            return jsonify({'error': 'Session ID is required'}), 400
+        
+        if session_id not in sessions:
+            return jsonify({'error': 'Session not found'}), 404
+        
+        session = sessions[session_id]
         
         # Get response from Cerebras with conversation context
-        chat_response = llm_service.get_chat_response(user_message, user_sessions[session_id]['conversation_history'])
+        chat_response = llm_service.get_chat_response(user_message, session['conversation_history'])
         
         # Add user message and AI response to conversation history
-        user_sessions[session_id]['conversation_history'].append({"role": "user", "content": user_message})
-        
-        # Add AI response to conversation history
-        user_sessions[session_id]['conversation_history'].append({"role": "assistant", "content": chat_response})
+        session['conversation_history'].append({"role": "user", "content": user_message})
+        session['conversation_history'].append({"role": "assistant", "content": chat_response})
         
         # Store the conversation
         message_id = str(uuid.uuid4())
-        user_sessions[session_id]['messages'].append({
+        session['messages'].append({
             'id': message_id,
             'user_message': user_message,
-            'chat_response': chat_response
+            'chat_response': chat_response,
+            'timestamp': datetime.now().isoformat()
         })
         
         return jsonify({
             'session_id': session_id,
             'message_id': message_id,
-            'chat_response': chat_response
+            'chat_response': chat_response,
+            'user_id': session['user_id']
         })
         
     except Exception as e:
@@ -75,12 +158,12 @@ def create_quiz_thread():
         if not message_id or not session_id:
             return jsonify({'error': 'Message ID and Session ID are required'}), 400
         
-        if session_id not in user_sessions:
+        if session_id not in sessions:
             return jsonify({'error': 'Session not found'}), 404
         
         # Find the specific message (search from bottom for recent messages)
         target_message = None
-        messages = user_sessions[session_id]['messages']
+        messages = sessions[session_id]['messages']
         for i in range(len(messages) - 1, -1, -1):
             if messages[i]['id'] == message_id:
                 target_message = messages[i]
@@ -94,12 +177,15 @@ def create_quiz_thread():
         
         # Create quiz thread
         quiz_id = str(uuid.uuid4())
-        quiz_data[quiz_id] = {
+        quizzes[quiz_id] = {
+            'id': quiz_id,
             'session_id': session_id,
+            'user_id': sessions[session_id]['user_id'],
             'message_id': message_id,
             'questions': quiz_questions,
             'current_question_index': 0,
             'completed': False,
+            'created_at': datetime.now().isoformat(),
             'conversation_history': [
                 {"role": "user", "content": target_message['user_message']},
                 {"role": "assistant", "content": target_message['chat_response']},
@@ -107,7 +193,7 @@ def create_quiz_thread():
             ]  # Track complete quiz thread conversation in LLM-ready format
         }
         
-        user_sessions[session_id]['quizzes'].append(quiz_id)
+        sessions[session_id]['quizzes'].append(quiz_id)
         
         return jsonify({
             'quiz_id': quiz_id,
@@ -123,10 +209,10 @@ def create_quiz_thread():
 def get_quiz(quiz_id):
     """Get quiz questions"""
     try:
-        if quiz_id not in quiz_data:
+        if quiz_id not in quizzes:
             return jsonify({'error': 'Quiz not found'}), 404
         
-        quiz = quiz_data[quiz_id]
+        quiz = quizzes[quiz_id]
         return jsonify({
             'quiz_id': quiz_id,
             'questions': quiz['questions']
@@ -142,13 +228,13 @@ def submit_quiz_answer(quiz_id):
         data = request.get_json()
         user_answer = data.get('answer', '')
         
-        if quiz_id not in quiz_data:
+        if quiz_id not in quizzes:
             return jsonify({'error': 'Quiz not found'}), 404
         
         if not user_answer:
             return jsonify({'error': 'Answer is required'}), 400
         
-        quiz = quiz_data[quiz_id]
+        quiz = quizzes[quiz_id]
         current_index = quiz['current_question_index']
         
         # Check if there are questions to answer
@@ -193,13 +279,13 @@ def continue_quiz_conversation(quiz_id):
         data = request.get_json()
         user_message = data.get('message', '')
         
-        if quiz_id not in quiz_data:
+        if quiz_id not in quizzes:
             return jsonify({'error': 'Quiz not found'}), 404
         
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
-        quiz = quiz_data[quiz_id]
+        quiz = quizzes[quiz_id]
         
         # Add current message to conversation history
         quiz['conversation_history'].append({"role": "user", "content": user_message})
@@ -223,15 +309,15 @@ def continue_quiz_conversation(quiz_id):
 def get_session(session_id):
     """Get session history"""
     try:
-        if session_id not in user_sessions:
+        if session_id not in sessions:
             return jsonify({'error': 'Session not found'}), 404
         
-        session = user_sessions[session_id]
+        session = sessions[session_id]
         session_quizzes = []
         
         for quiz_id in session['quizzes']:
-            if quiz_id in quiz_data:
-                quiz = quiz_data[quiz_id]
+            if quiz_id in quizzes:
+                quiz = quizzes[quiz_id]
                 session_quizzes.append({
                     'quiz_id': quiz_id,
                     'completed': quiz['completed']
@@ -239,8 +325,39 @@ def get_session(session_id):
         
         return jsonify({
             'session_id': session_id,
+            'user_id': session['user_id'],
+            'created_at': session['created_at'],
             'messages': session['messages'],
             'quizzes': session_quizzes
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<user_id>/sessions', methods=['GET'])
+def get_user_sessions(user_id):
+    """Get all sessions for a user"""
+    try:
+        if user_id not in users:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user = users[user_id]
+        user_sessions = []
+        
+        for session_id in user['sessions']:
+            if session_id in sessions:
+                session = sessions[session_id]
+                user_sessions.append({
+                    'session_id': session_id,
+                    'created_at': session['created_at'],
+                    'message_count': len(session['messages']),
+                    'quiz_count': len(session['quizzes'])
+                })
+        
+        return jsonify({
+            'user_id': user_id,
+            'username': user['username'],
+            'sessions': user_sessions
         })
         
     except Exception as e:
