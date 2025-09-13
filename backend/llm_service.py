@@ -12,7 +12,7 @@ class CerebrasLLM:
     def __init__(self):
         self.api_url = "https://api.cerebras.ai/v1/chat/completions"
         self.api_key = os.getenv('CEREBRAS_API_KEY')
-        self.default_model = "cerebras-llama-2-7b-chat"
+        self.default_model = "cerebras-llama-2-7b-chat" # available models: cerebras-llama-2-7b-chat, cerebras-llama-2-13b-chat, cerebras-llama-2-70b-chat
     
     def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None) -> str:
         """
@@ -183,30 +183,30 @@ def main():
     # Initialize the LLM service
     llm = CerebrasLLM()
     
-    # # Test 1: Check API configuration
-    # print("\n1. Testing API Configuration:")
-    # print("-" * 30)
-    # is_configured = llm.is_api_configured()
-    # print(f"API Key configured: {is_configured}")
-    # if not is_configured:
-    #     print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
+    # Test 1: Check API configuration
+    print("\n1. Testing API Configuration:")
+    print("-" * 30)
+    is_configured = llm.is_api_configured()
+    print(f"API Key configured: {is_configured}")
+    if not is_configured:
+        print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
     
     # # Test 2: Get available models
-    # print("\n2. Testing Available Models:")
-    # print("-" * 30)
-    # models = llm.get_available_models()
-    # print("Available models:")
-    # for i, model in enumerate(models, 1):
-    #     print(f"  {i}. {model}")
+    print("\n2. Testing Available Models:")
+    print("-" * 30)
+    models = llm.get_available_models()
+    print("Available models:")
+    for i, model in enumerate(models, 1):
+        print(f"  {i}. {model}")
     
-    # # Test 3: Basic chat response (if API key is configured)
-    # print("\n3. Testing Basic Chat Response:")
-    # print("-" * 30)
-    # test_message = "What is artificial intelligence?"
-    # print(f"Test message: '{test_message}'")
+    # Test 3: Basic chat response (if API key is configured)
+    print("\n3. Testing Basic Chat Response:")
+    print("-" * 30)
+    test_message = "What is artificial intelligence?"
+    print(f"Test message: '{test_message}'")
     
-    # response = llm.get_chat_response(test_message)
-    # print(f"Response: {response}")
+    response = llm.get_chat_response(test_message)
+    print(f"Response: {response}")
     
     # # Test 4: Chat response with specific model
     # print("\n4. Testing Chat Response with Specific Model:")
