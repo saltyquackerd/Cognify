@@ -77,18 +77,36 @@ class LLM():
         Returns:
             List[Dict]: List containing one long-answer question
         """
-        quiz_gen_prompt = """You are a careful question writer. 
-                            Write a single long-answer question that tests deep understanding, not recall, of the response text.
-                            """
-        quiz_gen_prompt += response_text     
+
+        system_prompt = """"You are a question writer.
+                            Write EXACTLY ONE long-answer question.
+                            PRIORITIZE HIGHLIGHTS that also appear in <CONTEXT>. 
+                            Stay 100% within <CONTEXT>; do not use outside knowledge or add new terms.
+                            Output must be ONLY the question text—no rationale, no preface, no JSON, no bullets.
+                            Max 55 words. No examples. No answers."""
+
+        user_prompt = f"""<CONTEXT>
+                        {response_text}
+                        </CONTEXT>
+
+                        <HIGHLIGHTS>
+                        {user_highlight or "None"}
+                        </HIGHLIGHTS>
+
+                        Requirements:
+                        - Center the question on highlight terms that appear in <CONTEXT>.
+                        - Ask about relationships, mechanisms, trade-offs, or synthesis already present in <CONTEXT>.
+                        - Use ONLY terms that occur in <CONTEXT>.
+                        """
         
-        if user_highlight:
-            quiz_gen_prompt += "Weight the following highlights more when designing the question: \n"
-            quiz_gen_prompt += user_highlight
-        
-        return self.get_chat_response(quiz_gen_prompt, conversation_history = [{'role' : 'assistant', 'content' : response_text}])
+        conversation = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        return self.get_chat_response(system_prompt, conversation_history = conversation)
     
-    def evaluate_answer(self, conversation_history : str, question: str, user_answer: str) -> str:
+    def evaluate_answer(self, conversation_history : List[Dict], question: str, user_answer: str) -> str:
         """
         Returns evaluation of a long-answer response using LLM
         """
@@ -142,6 +160,10 @@ class LLM():
             "raw_judgment": judgment_response
         }
 
+    def get_title(self, response : str):
+        """
+        Generates chat title from first LLM response in conversation history
+        """
 
 def main():
     """Test all methods in the  class"""
@@ -192,22 +214,6 @@ def main():
     print(f"Generated simple quiz questions:")
     for response in simple_quiz:
         print(response, end='',flush=True)
-    
-    # # Test 6: Generate enhanced quiz questions
-    # print("\n6. Testing Enhanced Quiz Generation:")
-    # print("-" * 30)
-    # print("Generating enhanced quiz questions using LLM...")
-    
-    # enhanced_quiz = llm.generate_enhanced_quiz(sample_text, num_questions=2)
-    # print(f"Generated {len(enhanced_quiz)} enhanced quiz questions:")
-    # for i, question in enumerate(enhanced_quiz, 1):
-    #     print(f"\n  Question {i}:")
-    #     print(f"    ID: {question['id']}")
-    #     print(f"    Type: {question['type']}")
-    #     print(f"    Question: {question['question']}")
-    #     print(f"    Options: {question['options']}")
-    #     print(f"    Correct Answer Index: {question['correct_answer']}")
-    #     print(f"    Explanation: {question['explanation']}")
     
     # # Test 7: Error handling - test with empty message
     # print("\n7. Testing Error Handling:")
