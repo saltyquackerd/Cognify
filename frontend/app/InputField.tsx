@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, KeyboardEvent, forwardRef } from 'react';
 
 interface InputFieldProps {
   onSendMessage: (message: string) => void;
@@ -8,13 +8,16 @@ interface InputFieldProps {
   placeholder?: string;
 }
 
-export default function InputField({ 
+const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({ 
   onSendMessage, 
   disabled = false, 
   placeholder = "Message ChatGPT..." 
-}: InputFieldProps) {
+}, ref) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Use the forwarded ref or fallback to internal ref
+  const inputRef = ref || textareaRef;
 
   const handleSend = () => {
     if (message.trim() && !disabled) {
@@ -46,8 +49,8 @@ export default function InputField({
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
       <div className="relative flex items-end bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-200">
-        <textarea
-          ref={textareaRef}
+      <textarea
+        ref={inputRef}
           value={message}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
@@ -92,4 +95,8 @@ export default function InputField({
       </div>
     </div>
   );
-}
+});
+
+InputField.displayName = 'InputField';
+
+export default InputField;
