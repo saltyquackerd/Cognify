@@ -2,17 +2,19 @@ import requests
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+from cerebras.cloud.sdk import Cerebras
 
 # Load environment variables from .env file
 load_dotenv()
 
-class CerebrasLLM:
+class LLM:
     """Handles all LLM-related operations using Cerebras API"""
     
     def __init__(self):
-        self.api_url = "https://api.cerebras.ai/v1/chat/completions"
-        self.api_key = os.getenv('CEREBRAS_API_KEY')
-        self.default_model = "cerebras-llama-2-7b-chat"
+        self.default_model = "cerebras"
+        LLM.cerebras_client = Cerebras(
+            api_key=os.environ.get("CEREBRAS_API_KEY"),
+        )
     
     def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None) -> str:
         """
@@ -59,40 +61,29 @@ class CerebrasLLM:
         except requests.exceptions.RequestException as e:
             return f"Error communicating with Cerebras API: {str(e)}"
     
-    def generate_quiz_questions(self, response_text: str, num_questions: int = 3) -> List[Dict[str, Any]]:
+    def generate_quiz_questions(self, response_text: str, num_questions: int = 1) -> List[Dict[str, Any]]:
         """
-        Generate quiz questions based on response text
+        Generate a single long-answer question based on response text
         
         Args:
             response_text (str): Text to generate questions from
-            num_questions (int): Number of questions to generate
+            num_questions (int): Always 1 for long-answer format
             
         Returns:
-            List[Dict]: List of quiz questions
+            List[Dict]: List containing one long-answer question
         """
         import uuid
         
-        questions = []
-        sentences = response_text.split('. ')
+        # Generate a comprehensive understanding question
+        question = {
+            "id": str(uuid.uuid4()),
+            "type": "long_answer",
+            "question": f"Based on the following response, explain the key concepts and demonstrate your understanding. What are the main points, and how do they relate to each other?\n\nResponse: {response_text[:500]}{'...' if len(response_text) > 500 else ''}",
+            "source_text": response_text,
+            "explanation": "This question tests your understanding of the key concepts presented in the response."
+        }
         
-        for i in range(min(num_questions, len(sentences))):
-            if sentences[i].strip():
-                question = {
-                    "id": str(uuid.uuid4()),
-                    "type": "multiple_choice",
-                    "question": f"What is the main point of: '{sentences[i].strip()}'?",
-                    "options": [
-                        "It explains a key concept",
-                        "It provides an example", 
-                        "It summarizes information",
-                        "It asks a question"
-                    ],
-                    "correct_answer": 0,
-                    "explanation": sentences[i].strip()
-                }
-                questions.append(question)
-        
-        return questions
+        return [question]
     
     def generate_enhanced_quiz(self, response_text: str, num_questions: int = 3) -> List[Dict[str, Any]]:
         """
@@ -161,17 +152,67 @@ class CerebrasLLM:
         
         return questions[:num_questions]
     
-    def is_api_configured(self) -> bool:
-        """Check if Cerebras API is properly configured"""
-        return bool(self.api_key)
-    
-    def get_available_models(self) -> List[str]:
-        """Get list of available Cerebras models"""
-        return [
-            "cerebras-llama-2-7b-chat",
-            "cerebras-llama-2-13b-chat", 
-            "cerebras-llama-2-70b-chat"
-        ]
+    def judge_long_answer(self, question: str, user_answer: str, source_text: str) -> Dict[str, Any]:
+        """
+        Judge a long-answer response using LLM
+        
+        Args:
+            question (str): The original question
+            user_answer (str): User's answer
+            source_text (str): Source text the question was based on
+            
+        Returns:
+            Dict: Judgment with score, feedback, and explanation
+        """
+        prompt = f"""
+        You are an educational assessment AI. Please evaluate the following student's answer to a comprehension question.
+
+        ORIGINAL QUESTION:
+        {question}
+
+        SOURCE TEXT:
+        {source_text}
+
+        STUDENT'S ANSWER:
+        {user_answer}
+
+        Please provide:
+        1. A score from 0-100 based on accuracy, completeness, and understanding
+        2. Specific feedback on what they got right and what could be improved
+        3. An explanation of the key concepts they should have covered
+
+        Format your response as:
+        SCORE: [0-100]
+        FEEDBACK: [detailed feedback]
+        EXPLANATION: [key concepts explanation]
+        """
+        
+        judgment_response = self.get_chat_response(prompt)
+        
+        # Parse the response
+        lines = judgment_response.split('\n')
+        score = 0
+        feedback = ""
+        explanation = ""
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('SCORE:'):
+                try:
+                    score = int(line.replace('SCORE:', '').strip())
+                except:
+                    score = 50  # Default score if parsing fails
+            elif line.startswith('FEEDBACK:'):
+                feedback = line.replace('FEEDBACK:', '').strip()
+            elif line.startswith('EXPLANATION:'):
+                explanation = line.replace('EXPLANATION:', '').strip()
+        
+        return {
+            "score": score,
+            "feedback": feedback,
+            "explanation": explanation,
+            "raw_judgment": judgment_response
+        }
 
 
 def main():
@@ -183,30 +224,30 @@ def main():
     # Initialize the LLM service
     llm = CerebrasLLM()
     
-    # # Test 1: Check API configuration
-    # print("\n1. Testing API Configuration:")
-    # print("-" * 30)
-    # is_configured = llm.is_api_configured()
-    # print(f"API Key configured: {is_configured}")
-    # if not is_configured:
-    #     print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
+    # Test 1: Check API configuration
+    print("\n1. Testing API Configuration:")
+    print("-" * 30)
+    is_configured = llm.is_api_configured()
+    print(f"API Key configured: {is_configured}")
+    if not is_configured:
+        print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
     
     # # Test 2: Get available models
-    # print("\n2. Testing Available Models:")
-    # print("-" * 30)
-    # models = llm.get_available_models()
-    # print("Available models:")
-    # for i, model in enumerate(models, 1):
-    #     print(f"  {i}. {model}")
+    print("\n2. Testing Available Models:")
+    print("-" * 30)
+    models = llm.get_available_models()
+    print("Available models:")
+    for i, model in enumerate(models, 1):
+        print(f"  {i}. {model}")
     
-    # # Test 3: Basic chat response (if API key is configured)
-    # print("\n3. Testing Basic Chat Response:")
-    # print("-" * 30)
-    # test_message = "What is artificial intelligence?"
-    # print(f"Test message: '{test_message}'")
+    # Test 3: Basic chat response (if API key is configured)
+    print("\n3. Testing Basic Chat Response:")
+    print("-" * 30)
+    test_message = "What is artificial intelligence?"
+    print(f"Test message: '{test_message}'")
     
-    # response = llm.get_chat_response(test_message)
-    # print(f"Response: {response}")
+    response = llm.get_chat_response(test_message)
+    print(f"Response: {response}")
     
     # # Test 4: Chat response with specific model
     # print("\n4. Testing Chat Response with Specific Model:")
