@@ -15,12 +15,13 @@ class CerebrasLLM:
         print(self.api_key) 
         self.default_model = "cerebras-llama-2-7b-chat"
     
-    def get_chat_response(self, message: str, model: str = None) -> str:
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None) -> str:
         """
-        Get response from Cerebras API for a given message
+        Get response from Cerebras API for a given message with conversation context
         
         Args:
             message (str): User's message/query
+            conversation_history (List[Dict], optional): Previous conversation messages
             model (str, optional): Model to use. Defaults to default_model
             
         Returns:
@@ -35,11 +36,17 @@ class CerebrasLLM:
             "Content-Type": "application/json"
         }
         
+        # Build messages array with conversation history
+        messages = []
+        if conversation_history:
+            messages.extend(conversation_history)
+        
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
         data = {
             "model": model,
-            "messages": [
-                {"role": "user", "content": message}
-            ],
+            "messages": messages,
             "max_tokens": 500,
             "temperature": 0.7
         }
