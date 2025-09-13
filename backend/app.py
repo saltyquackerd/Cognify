@@ -98,8 +98,8 @@ def create_quiz_thread():
             'session_id': session_id,
             'message_id': message_id,
             'questions': quiz_questions,
+            'current_question_index': 0,
             'completed': False,
-            'score': None,
             'conversation_history': [
                 {"role": "user", "content": target_message['user_message']},
                 {"role": "assistant", "content": target_message['chat_response']},
@@ -149,7 +149,13 @@ def submit_quiz_answer(quiz_id):
             return jsonify({'error': 'Answer is required'}), 400
         
         quiz = quiz_data[quiz_id]
-        question = quiz['questions'][0]  # Single long-answer question
+        current_index = quiz['current_question_index']
+        
+        # Check if there are questions to answer
+        if current_index >= len(quiz['questions']):
+            return jsonify({'error': 'No more questions to answer'}), 400
+        
+        question = quiz['questions'][current_index]
         
         # Get AI judgment
         judgment = llm_service.judge_long_answer(
@@ -161,19 +167,20 @@ def submit_quiz_answer(quiz_id):
         # Store the answer and judgment in quiz conversation history
         quiz['conversation_history'].extend([
             {"role": "user", "content": user_answer},
-            {"role": "assistant", "content": f"Score: {judgment['score']}/100\nFeedback: {judgment['feedback']}"}
+            {"role": "assistant", "content": judgment}
         ])
         
-        # Update quiz completion status
-        quiz['completed'] = True
-        quiz['score'] = judgment['score']
+        # Move to next question or mark as completed
+        quiz['current_question_index'] += 1
+        if quiz['current_question_index'] >= len(quiz['questions']):
+            quiz['completed'] = True
         
         return jsonify({
             'quiz_id': quiz_id,
-            'score': judgment['score'],
-            'feedback': judgment['feedback'],
-            'explanation': judgment['explanation'],
-            'conversation_history': quiz['conversation_history']
+            'judgment': judgment,
+            'conversation_history': quiz['conversation_history'],
+            'completed': quiz['completed'],
+            'has_more_questions': quiz['current_question_index'] < len(quiz['questions'])
         })
         
     except Exception as e:
@@ -227,7 +234,6 @@ def get_session(session_id):
                 quiz = quiz_data[quiz_id]
                 session_quizzes.append({
                     'quiz_id': quiz_id,
-                    'score': quiz['score'],
                     'completed': quiz['completed']
                 })
         
