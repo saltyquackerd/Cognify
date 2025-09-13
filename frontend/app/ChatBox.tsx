@@ -1,28 +1,53 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import InputField from './InputField';
+import { useStore } from './store/useStore';
 
 interface Message {
   id: string;
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
+  conversationId: string;
 }
 
 export default function ChatBox() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { 
+    selectedConversation, 
+    selectedConversationId, 
+    messages, 
+    addMessage, 
+    getMessagesForConversation,
+    updateConversationLastMessage
+  } = useStore();
+  
   const [isLoading, setIsLoading] = useState(false);
+  const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
+
+  // Update current messages when conversation changes
+  useEffect(() => {
+    if (selectedConversationId) {
+      const conversationMessages = getMessagesForConversation(selectedConversationId);
+      setCurrentMessages(conversationMessages);
+    } else {
+      setCurrentMessages([]);
+    }
+  }, [selectedConversationId, messages, getMessagesForConversation]);
 
   const handleSendMessage = async (content: string) => {
+    if (!selectedConversationId) return;
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
       role: 'user',
       timestamp: new Date(),
+      conversationId: selectedConversationId,
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    addMessage(userMessage);
+    updateConversationLastMessage(selectedConversationId, content);
     setIsLoading(true);
 
     // Simulate AI response (replace with actual API call)
@@ -32,8 +57,10 @@ export default function ChatBox() {
         content: "I'm a placeholder response. Connect me to your backend!",
         role: 'assistant',
         timestamp: new Date(),
+        conversationId: selectedConversationId,
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      addMessage(assistantMessage);
+      updateConversationLastMessage(selectedConversationId, assistantMessage.content);
       setIsLoading(false);
     }, 1000);
   };
@@ -43,9 +70,26 @@ export default function ChatBox() {
       {/* Header */}
       <header className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Cognify
-          </h1>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {selectedConversation ? selectedConversation.title : 'Cognify'}
+              </h1>
+              {selectedConversation && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {selectedConversation.lastMessage}
+                </p>
+              )}
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Conversation ID
+              </div>
+              <div className="text-sm font-mono text-gray-700 dark:text-gray-300">
+                {selectedConversationId || 'None'}
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -54,20 +98,20 @@ export default function ChatBox() {
         <div className="h-full max-w-4xl mx-auto flex flex-col">
           {/* Messages Container */}
           <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-            {messages.length === 0 ? (
+            {currentMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <div className="max-w-md">
                   <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
-                    Welcome to Cognify
+                    {selectedConversation ? `Welcome to ${selectedConversation.title}` : 'Welcome to Cognify'}
                   </h2>
                   <p className="text-gray-600 dark:text-gray-400 mb-8">
-                    Start a conversation by typing a message below.
+                    {selectedConversation ? 'Start chatting in this conversation.' : 'Select a conversation from the sidebar to start chatting.'}
                   </p>
                 </div>
               </div>
             ) : (
               <>
-                {messages.map((message) => (
+                {currentMessages.map((message) => (
                   <div
                     key={message.id}
                     className={`flex ${
