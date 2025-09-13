@@ -64,7 +64,7 @@ export default function MessageList() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700">
+    <div className="flex flex-col h-full w-80 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <button

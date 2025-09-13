@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import InputField from './InputField';
 import { useStore } from './store/useStore';
 import SidePopup from './SidePopup';
@@ -25,12 +25,20 @@ export default function ChatBox() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Update current messages when conversation changes
   useEffect(() => {
     if (selectedConversationId) {
       const conversationMessages = getMessagesForConversation(selectedConversationId);
       setCurrentMessages(conversationMessages);
+      
+      // Focus the input field when a conversation is selected
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100); // Small delay to ensure the component is rendered
     } else {
       setCurrentMessages([]);
     }
@@ -186,6 +194,7 @@ export default function ChatBox() {
           {/* Input Field at Bottom */}
           <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <InputField
+              ref={inputRef}
               onSendMessage={handleSendMessage}
               disabled={isLoading}
               placeholder="Message Cognify..."
