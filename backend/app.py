@@ -1,11 +1,10 @@
 import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests
-import json
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
+from llm_service import CerebrasLLM
 
 # Load environment variables
 load_dotenv()
@@ -13,73 +12,12 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Configuration
-CEREBRAS_API_URL = "https://api.cerebras.ai/v1/chat/completions"
-CEREBRAS_API_KEY = os.getenv('CEREBRAS_API_KEY')
+# Initialize LLM service
+llm_service = CerebrasLLM()
 
 # In-memory storage for demo purposes (use a database in production)
 user_sessions = {}
 quiz_data = {}
-
-class QuizGenerator:
-    """Generates quiz questions from ChatGPT responses"""
-    
-    @staticmethod
-    def generate_quiz_questions(response_text, num_questions=3):
-        """Generate quiz questions based on the response text"""
-        questions = []
-        
-        # Simple question generation logic (you can enhance this)
-        sentences = response_text.split('. ')
-        
-        for i in range(min(num_questions, len(sentences))):
-            if sentences[i].strip():
-                # Create a fill-in-the-blank or multiple choice question
-                question = {
-                    "id": str(uuid.uuid4()),
-                    "type": "multiple_choice",
-                    "question": f"What is the main point of: '{sentences[i].strip()}'?",
-                    "options": [
-                        "It explains a key concept",
-                        "It provides an example",
-                        "It summarizes information",
-                        "It asks a question"
-                    ],
-                    "correct_answer": 0,
-                    "explanation": sentences[i].strip()
-                }
-                questions.append(question)
-        
-        return questions
-
-class CerebrasChat:
-    """Handles communication with Cerebras API"""
-    
-    @staticmethod
-    def get_chat_response(message, model="cerebras-llama-2-7b-chat"):
-        """Get response from Cerebras API"""
-        headers = {
-            "Authorization": f"Bearer {CEREBRAS_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        data = {
-            "model": model,
-            "messages": [
-                {"role": "user", "content": message}
-            ],
-            "max_tokens": 500,
-            "temperature": 0.7
-        }
-        
-        try:
-            response = requests.post(CEREBRAS_API_URL, headers=headers, json=data)
-            response.raise_for_status()
-            
-            result = response.json()
-            return result['choices'][0]['message']['content']
-        except requests.exceptions.RequestException as e:
-            return f"Error communicating with Cerebras API: {str(e)}"
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -93,7 +31,7 @@ def chat():
             return jsonify({'error': 'Message is required'}), 400
         
         # Get response from Cerebras
-        chat_response = CerebrasChat.get_chat_response(user_message)
+        chat_response = llm_service.get_chat_response(user_message)
         
         # Store session data
         if session_id not in user_sessions:
@@ -136,7 +74,7 @@ def generate_quiz():
             return jsonify({'error': 'Session not found'}), 404
         
         # Generate quiz questions
-        quiz_questions = QuizGenerator.generate_quiz_questions(chat_response)
+        quiz_questions = llm_service.generate_enhanced_quiz(chat_response)
         
         # Store quiz data
         quiz_id = str(uuid.uuid4())
@@ -262,11 +200,12 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'cerebras_configured': bool(CEREBRAS_API_KEY)
+        'cerebras_configured': llm_service.is_api_configured(),
+        'available_models': llm_service.get_available_models()
     })
 
 if __name__ == '__main__':
-    if not CEREBRAS_API_KEY:
+    if not llm_service.is_api_configured():
         print("Warning: CEREBRAS_API_KEY not found in environment variables")
         print("Please set your Cerebras API key in a .env file")
     
