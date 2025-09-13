@@ -59,40 +59,29 @@ class CerebrasLLM:
         except requests.exceptions.RequestException as e:
             return f"Error communicating with Cerebras API: {str(e)}"
     
-    def generate_quiz_questions(self, response_text: str, num_questions: int = 3) -> List[Dict[str, Any]]:
+    def generate_quiz_questions(self, response_text: str, num_questions: int = 1) -> List[Dict[str, Any]]:
         """
-        Generate quiz questions based on response text
+        Generate a single long-answer question based on response text
         
         Args:
             response_text (str): Text to generate questions from
-            num_questions (int): Number of questions to generate
+            num_questions (int): Always 1 for long-answer format
             
         Returns:
-            List[Dict]: List of quiz questions
+            List[Dict]: List containing one long-answer question
         """
         import uuid
         
-        questions = []
-        sentences = response_text.split('. ')
+        # Generate a comprehensive understanding question
+        question = {
+            "id": str(uuid.uuid4()),
+            "type": "long_answer",
+            "question": f"Based on the following response, explain the key concepts and demonstrate your understanding. What are the main points, and how do they relate to each other?\n\nResponse: {response_text[:500]}{'...' if len(response_text) > 500 else ''}",
+            "source_text": response_text,
+            "explanation": "This question tests your understanding of the key concepts presented in the response."
+        }
         
-        for i in range(min(num_questions, len(sentences))):
-            if sentences[i].strip():
-                question = {
-                    "id": str(uuid.uuid4()),
-                    "type": "multiple_choice",
-                    "question": f"What is the main point of: '{sentences[i].strip()}'?",
-                    "options": [
-                        "It explains a key concept",
-                        "It provides an example", 
-                        "It summarizes information",
-                        "It asks a question"
-                    ],
-                    "correct_answer": 0,
-                    "explanation": sentences[i].strip()
-                }
-                questions.append(question)
-        
-        return questions
+        return [question]
     
     def generate_enhanced_quiz(self, response_text: str, num_questions: int = 3) -> List[Dict[str, Any]]:
         """
@@ -160,6 +149,68 @@ class CerebrasLLM:
             return self.generate_quiz_questions(response_text, num_questions)
         
         return questions[:num_questions]
+    
+    def judge_long_answer(self, question: str, user_answer: str, source_text: str) -> Dict[str, Any]:
+        """
+        Judge a long-answer response using LLM
+        
+        Args:
+            question (str): The original question
+            user_answer (str): User's answer
+            source_text (str): Source text the question was based on
+            
+        Returns:
+            Dict: Judgment with score, feedback, and explanation
+        """
+        prompt = f"""
+        You are an educational assessment AI. Please evaluate the following student's answer to a comprehension question.
+
+        ORIGINAL QUESTION:
+        {question}
+
+        SOURCE TEXT:
+        {source_text}
+
+        STUDENT'S ANSWER:
+        {user_answer}
+
+        Please provide:
+        1. A score from 0-100 based on accuracy, completeness, and understanding
+        2. Specific feedback on what they got right and what could be improved
+        3. An explanation of the key concepts they should have covered
+
+        Format your response as:
+        SCORE: [0-100]
+        FEEDBACK: [detailed feedback]
+        EXPLANATION: [key concepts explanation]
+        """
+        
+        judgment_response = self.get_chat_response(prompt)
+        
+        # Parse the response
+        lines = judgment_response.split('\n')
+        score = 0
+        feedback = ""
+        explanation = ""
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('SCORE:'):
+                try:
+                    score = int(line.replace('SCORE:', '').strip())
+                except:
+                    score = 50  # Default score if parsing fails
+            elif line.startswith('FEEDBACK:'):
+                feedback = line.replace('FEEDBACK:', '').strip()
+            elif line.startswith('EXPLANATION:'):
+                explanation = line.replace('EXPLANATION:', '').strip()
+        
+        return {
+            "score": score,
+            "feedback": feedback,
+            "explanation": explanation,
+            "raw_judgment": judgment_response
+        }
     
     def is_api_configured(self) -> bool:
         """Check if Cerebras API is properly configured"""

@@ -100,7 +100,8 @@ def create_quiz_thread():
             'questions': quiz_questions,
             'created_at': datetime.now().isoformat(),
             'completed': False,
-            'score': None
+            'score': None,
+            'conversation_history': []  # Track quiz thread conversation
         }
         
         user_sessions[session_id]['quizzes'].append(quiz_id)
@@ -132,52 +133,93 @@ def get_quiz(quiz_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/quiz/<quiz_id>/submit', methods=['POST'])
-def submit_quiz(quiz_id):
-    """Submit quiz answers and get score"""
+@app.route('/api/quiz/<quiz_id>/answer', methods=['POST'])
+def submit_quiz_answer(quiz_id):
+    """Submit a long-answer response and get AI judgment"""
     try:
         data = request.get_json()
-        answers = data.get('answers', [])
+        user_answer = data.get('answer', '')
         
         if quiz_id not in quiz_data:
             return jsonify({'error': 'Quiz not found'}), 404
         
+        if not user_answer:
+            return jsonify({'error': 'Answer is required'}), 400
+        
         quiz = quiz_data[quiz_id]
-        questions = quiz['questions']
+        question = quiz['questions'][0]  # Single long-answer question
         
-        if len(answers) != len(questions):
-            return jsonify({'error': 'Number of answers must match number of questions'}), 400
+        # Get AI judgment
+        judgment = llm_service.judge_long_answer(
+            question['question'], 
+            user_answer, 
+            question['source_text']
+        )
         
-        # Calculate score
-        correct_answers = 0
-        results = []
+        # Store the answer and judgment in quiz conversation history
+        answer_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'user_answer': user_answer,
+            'judgment': judgment
+        }
         
-        for i, (question, answer) in enumerate(zip(questions, answers)):
-            is_correct = answer == question['correct_answer']
-            if is_correct:
-                correct_answers += 1
-            
-            results.append({
-                'question_id': question['id'],
-                'user_answer': answer,
-                'correct_answer': question['correct_answer'],
-                'is_correct': is_correct,
-                'explanation': question['explanation']
-            })
+        quiz['conversation_history'].append(answer_entry)
         
-        score = (correct_answers / len(questions)) * 100
-        
-        # Update quiz data
-        quiz_data[quiz_id]['completed'] = True
-        quiz_data[quiz_id]['score'] = score
-        quiz_data[quiz_id]['results'] = results
+        # Update quiz completion status
+        quiz['completed'] = True
+        quiz['score'] = judgment['score']
         
         return jsonify({
             'quiz_id': quiz_id,
-            'score': score,
-            'correct_answers': correct_answers,
-            'total_questions': len(questions),
-            'results': results
+            'score': judgment['score'],
+            'feedback': judgment['feedback'],
+            'explanation': judgment['explanation'],
+            'conversation_history': quiz['conversation_history']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/quiz/<quiz_id>/continue', methods=['POST'])
+def continue_quiz_conversation(quiz_id):
+    """Continue the quiz conversation with follow-up questions"""
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '')
+        
+        if quiz_id not in quiz_data:
+            return jsonify({'error': 'Quiz not found'}), 404
+        
+        if not user_message:
+            return jsonify({'error': 'Message is required'}), 400
+        
+        quiz = quiz_data[quiz_id]
+        
+        # Build conversation history for the quiz thread
+        conversation_history = []
+        for entry in quiz['conversation_history']:
+            conversation_history.append({"role": "user", "content": entry['user_answer']})
+            conversation_history.append({"role": "assistant", "content": f"Score: {entry['judgment']['score']}/100\nFeedback: {entry['judgment']['feedback']}"})
+        
+        # Add current message
+        conversation_history.append({"role": "user", "content": user_message})
+        
+        # Get AI response
+        ai_response = llm_service.get_chat_response("", conversation_history)
+        
+        # Store the conversation
+        conversation_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'user_message': user_message,
+            'ai_response': ai_response
+        }
+        
+        quiz['conversation_history'].append(conversation_entry)
+        
+        return jsonify({
+            'quiz_id': quiz_id,
+            'ai_response': ai_response,
+            'conversation_history': quiz['conversation_history']
         })
         
     except Exception as e:
