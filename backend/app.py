@@ -101,7 +101,20 @@ def create_quiz_thread():
             'created_at': datetime.now().isoformat(),
             'completed': False,
             'score': None,
-            'conversation_history': []  # Track quiz thread conversation
+            'conversation_history': [
+                {
+                    'type': 'original_question',
+                    'content': target_message['user_message']
+                },
+                {
+                    'type': 'original_response',
+                    'content': target_message['chat_response']
+                },
+                {
+                    'type': 'quiz_questions',
+                    'content': quiz_questions
+                }
+            ]  # Track complete quiz thread conversation
         }
         
         user_sessions[session_id]['quizzes'].append(quiz_id)
@@ -158,8 +171,8 @@ def submit_quiz_answer(quiz_id):
         
         # Store the answer and judgment in quiz conversation history
         answer_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'user_answer': user_answer,
+            'type': 'user_answer',
+            'content': user_answer,
             'judgment': judgment
         }
         
@@ -198,8 +211,20 @@ def continue_quiz_conversation(quiz_id):
         # Build conversation history for the quiz thread
         conversation_history = []
         for entry in quiz['conversation_history']:
-            conversation_history.append({"role": "user", "content": entry['user_answer']})
-            conversation_history.append({"role": "assistant", "content": f"Score: {entry['judgment']['score']}/100\nFeedback: {entry['judgment']['feedback']}"})
+            if entry['type'] == 'original_question':
+                conversation_history.append({"role": "user", "content": entry['content']})
+            elif entry['type'] == 'original_response':
+                conversation_history.append({"role": "assistant", "content": entry['content']})
+            elif entry['type'] == 'quiz_questions':
+                # Include quiz questions as context
+                questions_text = "\n".join([f"Q{i+1}: {q['question']}" for i, q in enumerate(entry['content'])])
+                conversation_history.append({"role": "assistant", "content": f"Quiz Questions:\n{questions_text}"})
+            elif entry['type'] == 'user_answer':
+                conversation_history.append({"role": "user", "content": entry['content']})
+                conversation_history.append({"role": "assistant", "content": f"Score: {entry['judgment']['score']}/100\nFeedback: {entry['judgment']['feedback']}"})
+            elif entry['type'] == 'follow_up':
+                conversation_history.append({"role": "user", "content": entry['user_message']})
+                conversation_history.append({"role": "assistant", "content": entry['ai_response']})
         
         # Add current message
         conversation_history.append({"role": "user", "content": user_message})
@@ -209,7 +234,7 @@ def continue_quiz_conversation(quiz_id):
         
         # Store the conversation
         conversation_entry = {
-            'timestamp': datetime.now().isoformat(),
+            'type': 'follow_up',
             'user_message': user_message,
             'ai_response': ai_response
         }
