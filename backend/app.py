@@ -173,7 +173,15 @@ def create_quiz_thread():
             return jsonify({'error': 'Message not found'}), 404
         
         # Generate quiz questions from the specific response
-        quiz_questions = llm_service.generate_quiz_questions(target_message['chat_response'])
+        quiz_questions_text = llm_service.generate_quiz_questions(target_message['chat_response'])
+        
+        # Create a single question structure from the generated text
+        quiz_questions = [{
+            'id': str(uuid.uuid4()),
+            'type': 'long_answer',
+            'question': quiz_questions_text,
+            'source_text': target_message['chat_response']
+        }]
         
         # Create quiz thread
         quiz_id = str(uuid.uuid4())
@@ -244,10 +252,10 @@ def submit_quiz_answer(quiz_id):
         question = quiz['questions'][current_index]
         
         # Get AI judgment
-        judgment = llm_service.judge_long_answer(
+        judgment = llm_service.evaluate_answer(
+            str(quiz['conversation_history']),
             question['question'], 
-            user_answer, 
-            question['source_text']
+            user_answer
         )
         
         # Store the answer and judgment in quiz conversation history
