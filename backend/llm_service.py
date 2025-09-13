@@ -12,7 +12,6 @@ class CerebrasLLM:
     def __init__(self):
         self.api_url = "https://api.cerebras.ai/v1/chat/completions"
         self.api_key = os.getenv('CEREBRAS_API_KEY')
-        print(self.api_key) 
         self.default_model = "cerebras-llama-2-7b-chat"
     
     def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None) -> str:
@@ -184,95 +183,95 @@ def main():
     # Initialize the LLM service
     llm = CerebrasLLM()
     
-    # Test 1: Check API configuration
-    print("\n1. Testing API Configuration:")
-    print("-" * 30)
-    is_configured = llm.is_api_configured()
-    print(f"API Key configured: {is_configured}")
-    if not is_configured:
-        print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
+    # # Test 1: Check API configuration
+    # print("\n1. Testing API Configuration:")
+    # print("-" * 30)
+    # is_configured = llm.is_api_configured()
+    # print(f"API Key configured: {is_configured}")
+    # if not is_configured:
+    #     print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
     
-    # Test 2: Get available models
-    print("\n2. Testing Available Models:")
-    print("-" * 30)
-    models = llm.get_available_models()
-    print("Available models:")
-    for i, model in enumerate(models, 1):
-        print(f"  {i}. {model}")
+    # # Test 2: Get available models
+    # print("\n2. Testing Available Models:")
+    # print("-" * 30)
+    # models = llm.get_available_models()
+    # print("Available models:")
+    # for i, model in enumerate(models, 1):
+    #     print(f"  {i}. {model}")
     
-    # Test 3: Basic chat response (if API key is configured)
-    print("\n3. Testing Basic Chat Response:")
-    print("-" * 30)
-    test_message = "What is artificial intelligence?"
-    print(f"Test message: '{test_message}'")
+    # # Test 3: Basic chat response (if API key is configured)
+    # print("\n3. Testing Basic Chat Response:")
+    # print("-" * 30)
+    # test_message = "What is artificial intelligence?"
+    # print(f"Test message: '{test_message}'")
     
-    response = llm.get_chat_response(test_message)
-    print(f"Response: {response}")
+    # response = llm.get_chat_response(test_message)
+    # print(f"Response: {response}")
     
-    # Test 4: Chat response with specific model
-    print("\n4. Testing Chat Response with Specific Model:")
-    print("-" * 30)
-    specific_model = "cerebras-llama-2-7b-chat"
-    print(f"Using model: {specific_model}")
+    # # Test 4: Chat response with specific model
+    # print("\n4. Testing Chat Response with Specific Model:")
+    # print("-" * 30)
+    # specific_model = "cerebras-llama-2-7b-chat"
+    # print(f"Using model: {specific_model}")
     
-    response_with_model = llm.get_chat_response(test_message, specific_model)
-    print(f"Response: {response_with_model}")
+    # response_with_model = llm.get_chat_response(test_message, specific_model)
+    # print(f"Response: {response_with_model}")
     
-    # Test 5: Generate simple quiz questions
-    print("\n5. Testing Simple Quiz Generation:")
-    print("-" * 30)
-    sample_text = "Artificial Intelligence (AI) is a branch of computer science that aims to create machines capable of intelligent behavior. Machine learning is a subset of AI that focuses on algorithms that can learn from data. Deep learning uses neural networks with multiple layers to process complex patterns."
-    print(f"Sample text: '{sample_text[:100]}...'")
+    # # Test 5: Generate simple quiz questions
+    # print("\n5. Testing Simple Quiz Generation:")
+    # print("-" * 30)
+    # sample_text = "Artificial Intelligence (AI) is a branch of computer science that aims to create machines capable of intelligent behavior. Machine learning is a subset of AI that focuses on algorithms that can learn from data. Deep learning uses neural networks with multiple layers to process complex patterns."
+    # print(f"Sample text: '{sample_text[:100]}...'")
     
-    simple_quiz = llm.generate_quiz_questions(sample_text, num_questions=2)
-    print(f"Generated {len(simple_quiz)} simple quiz questions:")
-    for i, question in enumerate(simple_quiz, 1):
-        print(f"\n  Question {i}:")
-        print(f"    ID: {question['id']}")
-        print(f"    Type: {question['type']}")
-        print(f"    Question: {question['question']}")
-        print(f"    Options: {question['options']}")
-        print(f"    Correct Answer Index: {question['correct_answer']}")
-        print(f"    Explanation: {question['explanation']}")
+    # simple_quiz = llm.generate_quiz_questions(sample_text, num_questions=2)
+    # print(f"Generated {len(simple_quiz)} simple quiz questions:")
+    # for i, question in enumerate(simple_quiz, 1):
+    #     print(f"\n  Question {i}:")
+    #     print(f"    ID: {question['id']}")
+    #     print(f"    Type: {question['type']}")
+    #     print(f"    Question: {question['question']}")
+    #     print(f"    Options: {question['options']}")
+    #     print(f"    Correct Answer Index: {question['correct_answer']}")
+    #     print(f"    Explanation: {question['explanation']}")
     
-    # Test 6: Generate enhanced quiz questions
-    print("\n6. Testing Enhanced Quiz Generation:")
-    print("-" * 30)
-    print("Generating enhanced quiz questions using LLM...")
+    # # Test 6: Generate enhanced quiz questions
+    # print("\n6. Testing Enhanced Quiz Generation:")
+    # print("-" * 30)
+    # print("Generating enhanced quiz questions using LLM...")
     
-    enhanced_quiz = llm.generate_enhanced_quiz(sample_text, num_questions=2)
-    print(f"Generated {len(enhanced_quiz)} enhanced quiz questions:")
-    for i, question in enumerate(enhanced_quiz, 1):
-        print(f"\n  Question {i}:")
-        print(f"    ID: {question['id']}")
-        print(f"    Type: {question['type']}")
-        print(f"    Question: {question['question']}")
-        print(f"    Options: {question['options']}")
-        print(f"    Correct Answer Index: {question['correct_answer']}")
-        print(f"    Explanation: {question['explanation']}")
+    # enhanced_quiz = llm.generate_enhanced_quiz(sample_text, num_questions=2)
+    # print(f"Generated {len(enhanced_quiz)} enhanced quiz questions:")
+    # for i, question in enumerate(enhanced_quiz, 1):
+    #     print(f"\n  Question {i}:")
+    #     print(f"    ID: {question['id']}")
+    #     print(f"    Type: {question['type']}")
+    #     print(f"    Question: {question['question']}")
+    #     print(f"    Options: {question['options']}")
+    #     print(f"    Correct Answer Index: {question['correct_answer']}")
+    #     print(f"    Explanation: {question['explanation']}")
     
-    # Test 7: Error handling - test with empty message
-    print("\n7. Testing Error Handling:")
-    print("-" * 30)
-    empty_response = llm.get_chat_response("")
-    print(f"Empty message response: {empty_response}")
+    # # Test 7: Error handling - test with empty message
+    # print("\n7. Testing Error Handling:")
+    # print("-" * 30)
+    # empty_response = llm.get_chat_response("")
+    # print(f"Empty message response: {empty_response}")
     
-    # Test 8: Edge cases for quiz generation
-    print("\n8. Testing Edge Cases:")
-    print("-" * 30)
+    # # Test 8: Edge cases for quiz generation
+    # print("\n8. Testing Edge Cases:")
+    # print("-" * 30)
     
-    # Test with very short text
-    short_text = "AI is smart."
-    short_quiz = llm.generate_quiz_questions(short_text, num_questions=5)
-    print(f"Short text quiz (requested 5, got {len(short_quiz)}): {len(short_quiz)} questions")
+    # # Test with very short text
+    # short_text = "AI is smart."
+    # short_quiz = llm.generate_quiz_questions(short_text, num_questions=5)
+    # print(f"Short text quiz (requested 5, got {len(short_quiz)}): {len(short_quiz)} questions")
     
-    # Test with empty text
-    empty_quiz = llm.generate_quiz_questions("", num_questions=3)
-    print(f"Empty text quiz: {len(empty_quiz)} questions")
+    # # Test with empty text
+    # empty_quiz = llm.generate_quiz_questions("", num_questions=3)
+    # print(f"Empty text quiz: {len(empty_quiz)} questions")
     
-    print("\n" + "=" * 60)
-    print("TESTING COMPLETE")
-    print("=" * 60)
+    # print("\n" + "=" * 60)
+    # print("TESTING COMPLETE")
+    # print("=" * 60)
 
 
 if __name__ == "__main__":
