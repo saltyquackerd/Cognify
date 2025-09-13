@@ -1,1 +1,1 @@
-# hackmitpractice
+# Cognify
