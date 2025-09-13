@@ -26,6 +26,12 @@ export default function ChatBox() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Function to scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Update current messages when conversation changes
   useEffect(() => {
@@ -43,6 +49,11 @@ export default function ChatBox() {
       setCurrentMessages([]);
     }
   }, [selectedConversationId, messages, getMessagesForConversation]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [currentMessages, isLoading]);
   const [sidePopupOpen, setSidePopupOpen] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
@@ -189,6 +200,8 @@ export default function ChatBox() {
                 )}
               </>
             )}
+            {/* Invisible element to scroll to */}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input Field at Bottom */}
