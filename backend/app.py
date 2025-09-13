@@ -33,7 +33,6 @@ def chat():
         # Initialize session if new
         if session_id not in user_sessions:
             user_sessions[session_id] = {
-                'created_at': datetime.now().isoformat(),
                 'messages': [],
                 'quizzes': [],
                 'conversation_history': []  # Store in LLM-ready format
@@ -53,8 +52,7 @@ def chat():
         user_sessions[session_id]['messages'].append({
             'id': message_id,
             'user_message': user_message,
-            'chat_response': chat_response,
-            'timestamp': datetime.now().isoformat()
+            'chat_response': chat_response
         })
         
         return jsonify({
@@ -80,11 +78,12 @@ def create_quiz_thread():
         if session_id not in user_sessions:
             return jsonify({'error': 'Session not found'}), 404
         
-        # Find the specific message
+        # Find the specific message (search from bottom for recent messages)
         target_message = None
-        for msg in user_sessions[session_id]['messages']:
-            if msg['id'] == message_id:
-                target_message = msg
+        messages = user_sessions[session_id]['messages']
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i]['id'] == message_id:
+                target_message = messages[i]
                 break
         
         if not target_message:
@@ -99,7 +98,6 @@ def create_quiz_thread():
             'session_id': session_id,
             'message_id': message_id,
             'questions': quiz_questions,
-            'created_at': datetime.now().isoformat(),
             'completed': False,
             'score': None,
             'conversation_history': [
@@ -131,8 +129,7 @@ def get_quiz(quiz_id):
         quiz = quiz_data[quiz_id]
         return jsonify({
             'quiz_id': quiz_id,
-            'questions': quiz['questions'],
-            'created_at': quiz['created_at']
+            'questions': quiz['questions']
         })
         
     except Exception as e:
@@ -231,13 +228,11 @@ def get_session(session_id):
                 session_quizzes.append({
                     'quiz_id': quiz_id,
                     'score': quiz['score'],
-                    'completed': quiz['completed'],
-                    'created_at': quiz['created_at']
+                    'completed': quiz['completed']
                 })
         
         return jsonify({
             'session_id': session_id,
-            'created_at': session['created_at'],
             'messages': session['messages'],
             'quizzes': session_quizzes
         })
@@ -250,7 +245,6 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
         'cerebras_configured': llm_service.is_api_configured(),
         'available_models': llm_service.get_available_models()
     })
