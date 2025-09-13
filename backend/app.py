@@ -21,7 +21,7 @@ quiz_data = {}
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """Handle chat requests"""
+    """Handle chat requests with conversation context"""
     try:
         data = request.get_json()
         user_message = data.get('message', '')
@@ -30,10 +30,7 @@ def chat():
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
-        # Get response from Cerebras
-        chat_response = llm_service.get_chat_response(user_message)
-        
-        # Store session data
+        # Initialize session if new
         if session_id not in user_sessions:
             user_sessions[session_id] = {
                 'created_at': datetime.now().isoformat(),
@@ -41,8 +38,19 @@ def chat():
                 'quizzes': []
             }
         
+        # Build conversation history for context
+        conversation_history = []
+        for msg in user_sessions[session_id]['messages']:
+            conversation_history.append({"role": "user", "content": msg['user_message']})
+            conversation_history.append({"role": "assistant", "content": msg['chat_response']})
+        
+        # Get response from Cerebras with conversation context
+        chat_response = llm_service.get_chat_response(user_message, conversation_history)
+        
         # Store the conversation
+        message_id = str(uuid.uuid4())
         user_sessions[session_id]['messages'].append({
+            'id': message_id,
             'user_message': user_message,
             'chat_response': chat_response,
             'timestamp': datetime.now().isoformat()
@@ -50,36 +58,45 @@ def chat():
         
         return jsonify({
             'session_id': session_id,
+            'message_id': message_id,
             'chat_response': chat_response
         })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/generate-quiz', methods=['POST'])
-def generate_quiz():
-    """Generate quiz questions from a chat response"""
+@app.route('/api/create-quiz-thread', methods=['POST'])
+def create_quiz_thread():
+    """Create a quiz thread from a specific chat response"""
     try:
         data = request.get_json()
-        chat_response = data.get('chat_response', '')
+        message_id = data.get('message_id', '')
         session_id = data.get('session_id', '')
         
-        if not chat_response:
-            return jsonify({'error': 'Chat response is required'}), 400
-        
-        if not session_id:
-            return jsonify({'error': 'Session ID is required'}), 400
+        if not message_id or not session_id:
+            return jsonify({'error': 'Message ID and Session ID are required'}), 400
         
         if session_id not in user_sessions:
             return jsonify({'error': 'Session not found'}), 404
         
-        # Generate quiz questions
-        quiz_questions = llm_service.generate_enhanced_quiz(chat_response)
+        # Find the specific message
+        target_message = None
+        for msg in user_sessions[session_id]['messages']:
+            if msg['id'] == message_id:
+                target_message = msg
+                break
         
-        # Store quiz data
+        if not target_message:
+            return jsonify({'error': 'Message not found'}), 404
+        
+        # Generate quiz questions from the specific response
+        quiz_questions = llm_service.generate_quiz_questions(target_message['chat_response'])
+        
+        # Create quiz thread
         quiz_id = str(uuid.uuid4())
         quiz_data[quiz_id] = {
             'session_id': session_id,
+            'message_id': message_id,
             'questions': quiz_questions,
             'created_at': datetime.now().isoformat(),
             'completed': False,
@@ -90,7 +107,9 @@ def generate_quiz():
         
         return jsonify({
             'quiz_id': quiz_id,
-            'quiz_questions': quiz_questions
+            'message_id': message_id,
+            'quiz_questions': quiz_questions,
+            'source_response': target_message['chat_response']
         })
         
     except Exception as e:

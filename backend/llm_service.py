@@ -1,6 +1,10 @@
 import requests
 import os
 from typing import List, Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class CerebrasLLM:
     """Handles all LLM-related operations using Cerebras API"""
@@ -10,12 +14,13 @@ class CerebrasLLM:
         self.api_key = os.getenv('CEREBRAS_API_KEY')
         self.default_model = "cerebras-llama-2-7b-chat"
     
-    def get_chat_response(self, message: str, model: str = None) -> str:
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None) -> str:
         """
-        Get response from Cerebras API for a given message
+        Get response from Cerebras API for a given message with conversation context
         
         Args:
             message (str): User's message/query
+            conversation_history (List[Dict], optional): Previous conversation messages
             model (str, optional): Model to use. Defaults to default_model
             
         Returns:
@@ -30,11 +35,17 @@ class CerebrasLLM:
             "Content-Type": "application/json"
         }
         
+        # Build messages array with conversation history
+        messages = []
+        if conversation_history:
+            messages.extend(conversation_history)
+        
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
         data = {
             "model": model,
-            "messages": [
-                {"role": "user", "content": message}
-            ],
+            "messages": messages,
             "max_tokens": 500,
             "temperature": 0.7
         }
@@ -161,3 +172,107 @@ class CerebrasLLM:
             "cerebras-llama-2-13b-chat", 
             "cerebras-llama-2-70b-chat"
         ]
+
+
+def main():
+    """Test all methods in the CerebrasLLM class"""
+    print("=" * 60)
+    print("TESTING CEREBRAS LLM SERVICE")
+    print("=" * 60)
+    
+    # Initialize the LLM service
+    llm = CerebrasLLM()
+    
+    # # Test 1: Check API configuration
+    # print("\n1. Testing API Configuration:")
+    # print("-" * 30)
+    # is_configured = llm.is_api_configured()
+    # print(f"API Key configured: {is_configured}")
+    # if not is_configured:
+    #     print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
+    
+    # # Test 2: Get available models
+    # print("\n2. Testing Available Models:")
+    # print("-" * 30)
+    # models = llm.get_available_models()
+    # print("Available models:")
+    # for i, model in enumerate(models, 1):
+    #     print(f"  {i}. {model}")
+    
+    # # Test 3: Basic chat response (if API key is configured)
+    # print("\n3. Testing Basic Chat Response:")
+    # print("-" * 30)
+    # test_message = "What is artificial intelligence?"
+    # print(f"Test message: '{test_message}'")
+    
+    # response = llm.get_chat_response(test_message)
+    # print(f"Response: {response}")
+    
+    # # Test 4: Chat response with specific model
+    # print("\n4. Testing Chat Response with Specific Model:")
+    # print("-" * 30)
+    # specific_model = "cerebras-llama-2-7b-chat"
+    # print(f"Using model: {specific_model}")
+    
+    # response_with_model = llm.get_chat_response(test_message, specific_model)
+    # print(f"Response: {response_with_model}")
+    
+    # # Test 5: Generate simple quiz questions
+    # print("\n5. Testing Simple Quiz Generation:")
+    # print("-" * 30)
+    # sample_text = "Artificial Intelligence (AI) is a branch of computer science that aims to create machines capable of intelligent behavior. Machine learning is a subset of AI that focuses on algorithms that can learn from data. Deep learning uses neural networks with multiple layers to process complex patterns."
+    # print(f"Sample text: '{sample_text[:100]}...'")
+    
+    # simple_quiz = llm.generate_quiz_questions(sample_text, num_questions=2)
+    # print(f"Generated {len(simple_quiz)} simple quiz questions:")
+    # for i, question in enumerate(simple_quiz, 1):
+    #     print(f"\n  Question {i}:")
+    #     print(f"    ID: {question['id']}")
+    #     print(f"    Type: {question['type']}")
+    #     print(f"    Question: {question['question']}")
+    #     print(f"    Options: {question['options']}")
+    #     print(f"    Correct Answer Index: {question['correct_answer']}")
+    #     print(f"    Explanation: {question['explanation']}")
+    
+    # # Test 6: Generate enhanced quiz questions
+    # print("\n6. Testing Enhanced Quiz Generation:")
+    # print("-" * 30)
+    # print("Generating enhanced quiz questions using LLM...")
+    
+    # enhanced_quiz = llm.generate_enhanced_quiz(sample_text, num_questions=2)
+    # print(f"Generated {len(enhanced_quiz)} enhanced quiz questions:")
+    # for i, question in enumerate(enhanced_quiz, 1):
+    #     print(f"\n  Question {i}:")
+    #     print(f"    ID: {question['id']}")
+    #     print(f"    Type: {question['type']}")
+    #     print(f"    Question: {question['question']}")
+    #     print(f"    Options: {question['options']}")
+    #     print(f"    Correct Answer Index: {question['correct_answer']}")
+    #     print(f"    Explanation: {question['explanation']}")
+    
+    # # Test 7: Error handling - test with empty message
+    # print("\n7. Testing Error Handling:")
+    # print("-" * 30)
+    # empty_response = llm.get_chat_response("")
+    # print(f"Empty message response: {empty_response}")
+    
+    # # Test 8: Edge cases for quiz generation
+    # print("\n8. Testing Edge Cases:")
+    # print("-" * 30)
+    
+    # # Test with very short text
+    # short_text = "AI is smart."
+    # short_quiz = llm.generate_quiz_questions(short_text, num_questions=5)
+    # print(f"Short text quiz (requested 5, got {len(short_quiz)}): {len(short_quiz)} questions")
+    
+    # # Test with empty text
+    # empty_quiz = llm.generate_quiz_questions("", num_questions=3)
+    # print(f"Empty text quiz: {len(empty_quiz)} questions")
+    
+    # print("\n" + "=" * 60)
+    # print("TESTING COMPLETE")
+    # print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
