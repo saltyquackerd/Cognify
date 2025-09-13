@@ -4,7 +4,7 @@ from flask_cors import CORS
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-from llm_service import CerebrasLLM
+from llm_service import LLM
 
 # Load environment variables
 load_dotenv()
@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Initialize LLM service
-llm_service = CerebrasLLM()
+llm_service = LLM()
 
 # In-memory storage for demo purposes (use a database in production)
 user_sessions = {}
@@ -38,11 +38,11 @@ def chat():
                 'conversation_history': []  # Store in LLM-ready format
             }
         
-        # Add user message to conversation history
-        user_sessions[session_id]['conversation_history'].append({"role": "user", "content": user_message})
-        
         # Get response from Cerebras with conversation context
-        chat_response = llm_service.get_chat_response("", user_sessions[session_id]['conversation_history'])
+        chat_response = llm_service.get_chat_response(user_message, user_sessions[session_id]['conversation_history'])
+        
+        # Add user message and AI response to conversation history
+        user_sessions[session_id]['conversation_history'].append({"role": "user", "content": user_message})
         
         # Add AI response to conversation history
         user_sessions[session_id]['conversation_history'].append({"role": "assistant", "content": chat_response})
