@@ -85,6 +85,7 @@ def create_session(user_id):
             'id': session_id,
             'user_id': user_id,
             'created_at': datetime.now().isoformat(),
+            'title': '',
             'messages': [],
             'quizzes': [],
             'conversation_history': []
@@ -128,6 +129,11 @@ def chat():
         session['conversation_history'].append({"role": "user", "content": user_message})
         session['conversation_history'].append({"role": "assistant", "content": chat_response})
         
+        # Set title after first user question if title is still empty
+        if not session['title']:
+            summary = f"User message: {user_message}\nChat response: {chat_response}"
+            session['title'] = llm_service.get_title(summary)
+        
         # Store the conversation
         message_id = str(uuid.uuid4())
         session['messages'].append({
@@ -141,7 +147,8 @@ def chat():
             'session_id': session_id,
             'message_id': message_id,
             'chat_response': chat_response,
-            'user_id': session['user_id']
+            'user_id': session['user_id'],
+            'title': session['title']
         })
         
     except Exception as e:
@@ -313,72 +320,63 @@ def continue_quiz_conversation(quiz_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/session/<session_id>', methods=['GET'])
-def get_session(session_id):
-    """Get session history"""
-    try:
-        if session_id not in sessions:
-            return jsonify({'error': 'Session not found'}), 404
+# @app.route('/api/session/<session_id>', methods=['GET'])
+# def get_session(session_id):
+#     """Get session history"""
+#     try:
+#         if session_id not in sessions:
+#             return jsonify({'error': 'Session not found'}), 404
         
-        session = sessions[session_id]
-        session_quizzes = []
+#         session = sessions[session_id]
+#         session_quizzes = []
         
-        for quiz_id in session['quizzes']:
-            if quiz_id in quizzes:
-                quiz = quizzes[quiz_id]
-                session_quizzes.append({
-                    'quiz_id': quiz_id,
-                    'completed': quiz['completed']
-                })
+#         for quiz_id in session['quizzes']:
+#             if quiz_id in quizzes:
+#                 quiz = quizzes[quiz_id]
+#                 session_quizzes.append({
+#                     'quiz_id': quiz_id,
+#                     'completed': quiz['completed']
+#                 })
         
-        return jsonify({
-            'session_id': session_id,
-            'user_id': session['user_id'],
-            'created_at': session['created_at'],
-            'messages': session['messages'],
-            'quizzes': session_quizzes
-        })
+#         return jsonify({
+#             'session_id': session_id,
+#             'user_id': session['user_id'],
+#             'created_at': session['created_at'],
+#             'messages': session['messages'],
+#             'quizzes': session_quizzes
+#         })
         
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/users/<user_id>/sessions', methods=['GET'])
-def get_user_sessions(user_id):
-    """Get all sessions for a user"""
-    try:
-        if user_id not in users:
-            return jsonify({'error': 'User not found'}), 404
+# @app.route('/api/users/<user_id>/sessions', methods=['GET'])
+# def get_user_sessions(user_id):
+#     """Get all sessions for a user"""
+#     try:
+#         if user_id not in users:
+#             return jsonify({'error': 'User not found'}), 404
         
-        user = users[user_id]
-        user_sessions = []
+#         user = users[user_id]
+#         user_sessions = []
         
-        for session_id in user['sessions']:
-            if session_id in sessions:
-                session = sessions[session_id]
-                user_sessions.append({
-                    'session_id': session_id,
-                    'created_at': session['created_at'],
-                    'message_count': len(session['messages']),
-                    'quiz_count': len(session['quizzes'])
-                })
+#         for session_id in user['sessions']:
+#             if session_id in sessions:
+#                 session = sessions[session_id]
+#                 user_sessions.append({
+#                     'session_id': session_id,
+#                     'created_at': session['created_at'],
+#                     'message_count': len(session['messages']),
+#                     'quiz_count': len(session['quizzes'])
+#                 })
         
-        return jsonify({
-            'user_id': user_id,
-            'username': user['username'],
-            'sessions': user_sessions
-        })
+#         return jsonify({
+#             'user_id': user_id,
+#             'username': user['username'],
+#             'sessions': user_sessions
+#         })
         
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'cerebras_configured': llm_service.is_api_configured(),
-        'available_models': llm_service.get_available_models()
-    })
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
