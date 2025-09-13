@@ -46,20 +46,20 @@ export const useStore = create<StoreState>((set, get) => ({
   conversations: [
     {
       id: '1',
-      title: 'How to build a React component',
-      lastMessage: 'Can you help me create a reusable button component?',
+      title: 'Welcome to Cognify',
+      lastMessage: 'Hello! How can I help you today?',
       timestamp: new Date('2024-01-15T10:30:00'),
       isActive: true
     },
     {
       id: '2',
-      title: 'JavaScript async/await patterns',
+      title: 'JavaScript help',
       lastMessage: 'What are the best practices for error handling?',
       timestamp: new Date('2024-01-14T15:45:00')
     },
     {
       id: '3',
-      title: 'CSS Grid vs Flexbox',
+      title: 'CSS questions',
       lastMessage: 'When should I use CSS Grid over Flexbox?',
       timestamp: new Date('2024-01-13T09:20:00')
     },
@@ -80,27 +80,20 @@ export const useStore = create<StoreState>((set, get) => ({
   messages: [
     {
       id: 'msg1',
-      content: 'Can you help me create a reusable button component?',
-      role: 'user',
+      content: 'Hello! How can I help you today?',
+      role: 'assistant',
       timestamp: new Date('2024-01-15T10:30:00'),
       conversationId: '1'
     },
     {
       id: 'msg2',
-      content: 'Absolutely! I\'d be happy to help you create a reusable button component. Here\'s a simple example using React and TypeScript...',
-      role: 'assistant',
-      timestamp: new Date('2024-01-15T10:31:00'),
-      conversationId: '1'
-    },
-    {
-      id: 'msg3',
       content: 'What are the best practices for error handling?',
       role: 'user',
       timestamp: new Date('2024-01-14T15:45:00'),
       conversationId: '2'
     },
     {
-      id: 'msg4',
+      id: 'msg3',
       content: 'Great question! Here are some key best practices for error handling in JavaScript...',
       role: 'assistant',
       timestamp: new Date('2024-01-14T15:46:00'),
