@@ -373,8 +373,4 @@ def health_check():
     })
 
 if __name__ == '__main__':
-    if not llm_service.is_api_configured():
-        print("Warning: CEREBRAS_API_KEY not found in environment variables")
-        print("Please set your Cerebras API key in a .env file")
-    
     app.run(debug=True, host='0.0.0.0', port=5000)
