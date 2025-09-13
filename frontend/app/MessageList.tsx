@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useStore } from './store/useStore';
+import { useStore, Conversation } from './store/useStore';
 
 export default function MessageList() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function MessageList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
-  const filteredConversations = conversations.filter(conv =>
+  const filteredConversations = conversations.filter((conv: Conversation) =>
     conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -102,7 +102,7 @@ export default function MessageList() {
           </div>
         ) : (
           <div className="space-y-1">
-            {filteredConversations.map((conversation) => (
+            {filteredConversations.map((conversation: Conversation) => (
               <div
                 key={conversation.id}
                 className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
