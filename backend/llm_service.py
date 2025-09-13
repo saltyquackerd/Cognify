@@ -7,12 +7,12 @@ from cerebras.cloud.sdk import Cerebras
 # Load environment variables from .env file
 load_dotenv()
 
-class LLM:
+class LLM():
     """Handles all LLM-related operations using Cerebras API"""
     
     def __init__(self):
-        self.default_model = "cerebras"
-        LLM.cerebras_client = Cerebras(
+        self.default_cerebras_model = "llama-4-scout-17b-16e-instruct"
+        self.cerebras_client = Cerebras(
             api_key=os.environ.get("CEREBRAS_API_KEY"),
         )
     
@@ -28,14 +28,15 @@ class LLM:
         Returns:
             str: AI response or error message
         """
-        if not self.api_key:
+        if not self.cerebras_client.api_key:
             return "Error: CEREBRAS_API_KEY not configured"
         
-        model = model or self.default_model
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        model = model or self.default_cerebras_model
+
+        # headers = {
+        #     "Authorization": f"Bearer {self.api_key}",
+        #     "Content-Type": "application/json"
+        # }
         
         # Build messages array with conversation history
         messages = []
@@ -45,19 +46,23 @@ class LLM:
         # Add current message
         messages.append({"role": "user", "content": message})
         
-        data = {
-            "model": model,
-            "messages": messages,
-            "max_tokens": 500,
-            "temperature": 0.7
-        }
+        # data = {
+        #     "model": model,
+        #     "messages": messages,
+        #     "max_tokens": 500,
+        #     "temperature": 0.7
+        # }
         
         try:
-            response = requests.post(self.api_url, headers=headers, json=data)
-            response.raise_for_status()
-            
-            result = response.json()
-            return result['choices'][0]['message']['content']
+            stream = self.cerebras_client.chat.completions.create(
+                messages=messages,
+                model=model,
+                stream=True
+            )
+        
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
         except requests.exceptions.RequestException as e:
             return f"Error communicating with Cerebras API: {str(e)}"
     
@@ -216,29 +221,13 @@ class LLM:
 
 
 def main():
-    """Test all methods in the CerebrasLLM class"""
+    """Test all methods in the  class"""
     print("=" * 60)
-    print("TESTING CEREBRAS LLM SERVICE")
+    print("TESTING LLM SERVICE")
     print("=" * 60)
     
     # Initialize the LLM service
-    llm = CerebrasLLM()
-    
-    # Test 1: Check API configuration
-    print("\n1. Testing API Configuration:")
-    print("-" * 30)
-    is_configured = llm.is_api_configured()
-    print(f"API Key configured: {is_configured}")
-    if not is_configured:
-        print("⚠️  Warning: CEREBRAS_API_KEY not set. Some tests will show error messages.")
-    
-    # # Test 2: Get available models
-    print("\n2. Testing Available Models:")
-    print("-" * 30)
-    models = llm.get_available_models()
-    print("Available models:")
-    for i, model in enumerate(models, 1):
-        print(f"  {i}. {model}")
+    llm = LLM()
     
     # Test 3: Basic chat response (if API key is configured)
     print("\n3. Testing Basic Chat Response:")
@@ -246,34 +235,45 @@ def main():
     test_message = "What is artificial intelligence?"
     print(f"Test message: '{test_message}'")
     
-    response = llm.get_chat_response(test_message)
-    print(f"Response: {response}")
+    gen = llm.get_chat_response(test_message)
+    for response in gen:
+        print(response,end='',flush=True)
     
-    # # Test 4: Chat response with specific model
-    # print("\n4. Testing Chat Response with Specific Model:")
-    # print("-" * 30)
-    # specific_model = "cerebras-llama-2-7b-chat"
-    # print(f"Using model: {specific_model}")
+    # Test 4: Chat response with specific model
+    print("\n4. Testing Chat Response with Specific Model:")
+    print("-" * 30)
+    specific_model = "llama3.1-8b"
+    print(f"Using model: {specific_model}")
     
-    # response_with_model = llm.get_chat_response(test_message, specific_model)
-    # print(f"Response: {response_with_model}")
+    response_with_model = llm.get_chat_response(test_message, model=specific_model)
+    history = ""
+    for response in response_with_model:
+        history += response
+        print(response,end='',flush=True)
+
+    # Test 4.5: Chat response with conversation history
+    print("\n4.5 Testing Chat Response with Conversation History:")
+    print("-" * 30)
     
-    # # Test 5: Generate simple quiz questions
-    # print("\n5. Testing Simple Quiz Generation:")
-    # print("-" * 30)
-    # sample_text = "Artificial Intelligence (AI) is a branch of computer science that aims to create machines capable of intelligent behavior. Machine learning is a subset of AI that focuses on algorithms that can learn from data. Deep learning uses neural networks with multiple layers to process complex patterns."
-    # print(f"Sample text: '{sample_text[:100]}...'")
+    response_with_history = llm.get_chat_response('Why are these developments important?', conversation_history = [{'role':'user','content':test_message}, {'role':'assistant','content':history}])
+    for response in response_with_history:
+        print(response,end='',flush=True)
     
-    # simple_quiz = llm.generate_quiz_questions(sample_text, num_questions=2)
-    # print(f"Generated {len(simple_quiz)} simple quiz questions:")
-    # for i, question in enumerate(simple_quiz, 1):
-    #     print(f"\n  Question {i}:")
-    #     print(f"    ID: {question['id']}")
-    #     print(f"    Type: {question['type']}")
-    #     print(f"    Question: {question['question']}")
-    #     print(f"    Options: {question['options']}")
-    #     print(f"    Correct Answer Index: {question['correct_answer']}")
-    #     print(f"    Explanation: {question['explanation']}")
+    # Test 5: Generate simple quiz questions
+    print("\n5. Testing Simple Quiz Generation:")
+    print("-" * 30)
+    sample_text = "Artificial Intelligence (AI) is a branch of computer science that aims to create machines capable of intelligent behavior. Machine learning is a subset of AI that focuses on algorithms that can learn from data. Deep learning uses neural networks with multiple layers to process complex patterns."
+    print(f"Sample text: '{sample_text[:100]}...'")
+    
+    simple_quiz = llm.generate_quiz_questions(sample_text, num_questions=2)
+    print(f"Generated {len(simple_quiz)} simple quiz questions:")
+    for i, question in enumerate(simple_quiz, 1):
+        print(f"\n  Question {i}:")
+        print(f"    ID: {question['id']}")
+        print(f"    Type: {question['type']}")
+        print(f"    Question: {question['question']}")
+        print(f"    Correct Answer Index: {question['correct_answer']}")
+        print(f"    Explanation: {question['explanation']}")
     
     # # Test 6: Generate enhanced quiz questions
     # print("\n6. Testing Enhanced Quiz Generation:")
