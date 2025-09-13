@@ -7,14 +7,12 @@ from cerebras.cloud.sdk import Cerebras
 # Load environment variables from .env file
 load_dotenv()
 
-class CerebrasLLM:
+class LLM:
     """Handles all LLM-related operations using Cerebras API"""
     
     def __init__(self):
-        self.api_url = "https://api.cerebras.ai/v1/chat/completions"
-        self.default_model = "cerebras-llama-2-7b-chat" # available models: cerebras-llama-2-7b-chat, cerebras-llama-2-13b-chat, cerebras-llama-2-70b-chat
-        client = Cerebras(
-            # This is the default and can be omitted
+        self.default_model = "cerebras"
+        LLM.cerebras_client = Cerebras(
             api_key=os.environ.get("CEREBRAS_API_KEY"),
         )
     
@@ -215,18 +213,6 @@ class CerebrasLLM:
             "explanation": explanation,
             "raw_judgment": judgment_response
         }
-    
-    def is_api_configured(self) -> bool:
-        """Check if Cerebras API is properly configured"""
-        return bool(self.api_key)
-    
-    def get_available_models(self) -> List[str]:
-        """Get list of available Cerebras models"""
-        return [
-            "cerebras-llama-2-7b-chat",
-            "cerebras-llama-2-13b-chat", 
-            "cerebras-llama-2-70b-chat"
-        ]
 
 
 def main():
