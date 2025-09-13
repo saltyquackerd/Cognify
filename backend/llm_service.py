@@ -2,6 +2,7 @@ import requests
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+from cerebras.cloud.sdk import Cerebras
 
 # Load environment variables from .env file
 load_dotenv()
@@ -11,8 +12,11 @@ class CerebrasLLM:
     
     def __init__(self):
         self.api_url = "https://api.cerebras.ai/v1/chat/completions"
-        self.api_key = os.getenv('CEREBRAS_API_KEY')
         self.default_model = "cerebras-llama-2-7b-chat" # available models: cerebras-llama-2-7b-chat, cerebras-llama-2-13b-chat, cerebras-llama-2-70b-chat
+        client = Cerebras(
+            # This is the default and can be omitted
+            api_key=os.environ.get("CEREBRAS_API_KEY"),
+        )
     
     def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None) -> str:
         """
