@@ -23,7 +23,7 @@ class LLM():
         Args:
             message (str): User's message/query
             conversation_history (List[Dict], optional): Previous conversation messages
-            model (str, optional): Model to use. Defaults to default_model
+            model (str, optional): Model to use (see Cerebras API). Defaults to default_model
             
         Returns:
             str: AI response or error message
@@ -66,108 +66,31 @@ class LLM():
         except requests.exceptions.RequestException as e:
             return f"Error communicating with Cerebras API: {str(e)}"
     
-    def generate_quiz_questions(self, response_text: str, num_questions: int = 1) -> List[Dict[str, Any]]:
+    def generate_quiz_questions(self, response_text: str, user_highlight: str = None) -> str:
         """
         Generate a single long-answer question based on response text
         
         Args:
             response_text (str): Text to generate questions from
-            num_questions (int): Always 1 for long-answer format
+            user_highlight
             
         Returns:
             List[Dict]: List containing one long-answer question
         """
-        import uuid
+        quiz_gen_prompt = """You are a careful question writer. 
+                            Write a single long-answer question that tests deep understanding, not recall, of the response text.
+                            """
+        quiz_gen_prompt += response_text     
         
-        # Generate a comprehensive understanding question
-        question = {
-            "id": str(uuid.uuid4()),
-            "type": "long_answer",
-            "question": f"Based on the following response, explain the key concepts and demonstrate your understanding. What are the main points, and how do they relate to each other?\n\nResponse: {response_text[:500]}{'...' if len(response_text) > 500 else ''}",
-            "source_text": response_text,
-            "explanation": "This question tests your understanding of the key concepts presented in the response."
-        }
+        if user_highlight:
+            quiz_gen_prompt += "Weight the following highlights more when designing the question: \n"
+            quiz_gen_prompt += user_highlight
         
-        return [question]
+        return self.get_chat_response(quiz_gen_prompt, conversation_history = [{'role' : 'assistant', 'content' : response_text}])
     
-    def generate_enhanced_quiz(self, response_text: str, num_questions: int = 3) -> List[Dict[str, Any]]:
+    def evaluate_answer(self, conversation_history : str, question: str, user_answer: str) -> str:
         """
-        Generate more sophisticated quiz questions using LLM
-        
-        Args:
-            response_text (str): Text to generate questions from
-            num_questions (int): Number of questions to generate
-            
-        Returns:
-            List[Dict]: List of enhanced quiz questions
-        """
-        import uuid
-        
-        prompt = f"""
-        Based on the following text, generate {num_questions} quiz questions with multiple choice answers.
-        Make the questions educational and test understanding of key concepts.
-        
-        Text: {response_text}
-        
-        Return the questions in this format:
-        Question: [question text]
-        A) [option 1]
-        B) [option 2] 
-        C) [option 3]
-        D) [option 4]
-        Correct: [A/B/C/D]
-        Explanation: [brief explanation]
-        """
-        
-        llm_response = self.get_chat_response(prompt)
-        
-        # Parse the LLM response and format as quiz questions
-        questions = []
-        lines = llm_response.split('\n')
-        
-        current_question = {}
-        for line in lines:
-            line = line.strip()
-            if line.startswith('Question:'):
-                if current_question:
-                    questions.append(current_question)
-                current_question = {
-                    "id": str(uuid.uuid4()),
-                    "type": "multiple_choice",
-                    "question": line.replace('Question:', '').strip(),
-                    "options": [],
-                    "correct_answer": 0,
-                    "explanation": ""
-                }
-            elif line.startswith(('A)', 'B)', 'C)', 'D)')):
-                current_question["options"].append(line[2:].strip())
-            elif line.startswith('Correct:'):
-                correct = line.replace('Correct:', '').strip()
-                correct_map = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
-                current_question["correct_answer"] = correct_map.get(correct, 0)
-            elif line.startswith('Explanation:'):
-                current_question["explanation"] = line.replace('Explanation:', '').strip()
-        
-        if current_question and len(current_question["options"]) == 4:
-            questions.append(current_question)
-        
-        # Fallback to simple questions if LLM parsing fails
-        if not questions:
-            return self.generate_quiz_questions(response_text, num_questions)
-        
-        return questions[:num_questions]
-    
-    def judge_long_answer(self, question: str, user_answer: str, source_text: str) -> Dict[str, Any]:
-        """
-        Judge a long-answer response using LLM
-        
-        Args:
-            question (str): The original question
-            user_answer (str): User's answer
-            source_text (str): Source text the question was based on
-            
-        Returns:
-            Dict: Judgment with score, feedback, and explanation
+        Returns evaluation of a long-answer response using LLM
         """
         prompt = f"""
         You are an educational assessment AI. Please evaluate the following student's answer to a comprehension question.
@@ -229,35 +152,35 @@ def main():
     # Initialize the LLM service
     llm = LLM()
     
-    # Test 3: Basic chat response (if API key is configured)
-    print("\n3. Testing Basic Chat Response:")
-    print("-" * 30)
-    test_message = "What is artificial intelligence?"
-    print(f"Test message: '{test_message}'")
+    # # Test 3: Basic chat response (if API key is configured)
+    # print("\n3. Testing Basic Chat Response:")
+    # print("-" * 30)
+    # test_message = "What is artificial intelligence?"
+    # print(f"Test message: '{test_message}'")
     
-    gen = llm.get_chat_response(test_message)
-    for response in gen:
-        print(response,end='',flush=True)
+    # gen = llm.get_chat_response(test_message)
+    # for response in gen:
+    #     print(response,end='',flush=True)
     
-    # Test 4: Chat response with specific model
-    print("\n4. Testing Chat Response with Specific Model:")
-    print("-" * 30)
-    specific_model = "llama3.1-8b"
-    print(f"Using model: {specific_model}")
+    # # Test 4: Chat response with specific model
+    # print("\n4. Testing Chat Response with Specific Model:")
+    # print("-" * 30)
+    # specific_model = "llama3.1-8b"
+    # print(f"Using model: {specific_model}")
     
-    response_with_model = llm.get_chat_response(test_message, model=specific_model)
-    history = ""
-    for response in response_with_model:
-        history += response
-        print(response,end='',flush=True)
+    # response_with_model = llm.get_chat_response(test_message, model=specific_model)
+    # history = ""
+    # for response in response_with_model:
+    #     history += response
+    #     print(response,end='',flush=True)
 
-    # Test 4.5: Chat response with conversation history
-    print("\n4.5 Testing Chat Response with Conversation History:")
-    print("-" * 30)
+    # # Test 4.5: Chat response with conversation history
+    # print("\n4.5 Testing Chat Response with Conversation History:")
+    # print("-" * 30)
     
-    response_with_history = llm.get_chat_response('Why are these developments important?', conversation_history = [{'role':'user','content':test_message}, {'role':'assistant','content':history}])
-    for response in response_with_history:
-        print(response,end='',flush=True)
+    # response_with_history = llm.get_chat_response('Why are these developments important?', conversation_history = [{'role':'user','content':test_message}, {'role':'assistant','content':history}])
+    # for response in response_with_history:
+    #     print(response,end='',flush=True)
     
     # Test 5: Generate simple quiz questions
     print("\n5. Testing Simple Quiz Generation:")
@@ -265,15 +188,10 @@ def main():
     sample_text = "Artificial Intelligence (AI) is a branch of computer science that aims to create machines capable of intelligent behavior. Machine learning is a subset of AI that focuses on algorithms that can learn from data. Deep learning uses neural networks with multiple layers to process complex patterns."
     print(f"Sample text: '{sample_text[:100]}...'")
     
-    simple_quiz = llm.generate_quiz_questions(sample_text, num_questions=2)
-    print(f"Generated {len(simple_quiz)} simple quiz questions:")
-    for i, question in enumerate(simple_quiz, 1):
-        print(f"\n  Question {i}:")
-        print(f"    ID: {question['id']}")
-        print(f"    Type: {question['type']}")
-        print(f"    Question: {question['question']}")
-        print(f"    Correct Answer Index: {question['correct_answer']}")
-        print(f"    Explanation: {question['explanation']}")
+    simple_quiz = llm.generate_quiz_questions(sample_text)
+    print(f"Generated simple quiz questions:")
+    for response in simple_quiz:
+        print(response, end='',flush=True)
     
     # # Test 6: Generate enhanced quiz questions
     # print("\n6. Testing Enhanced Quiz Generation:")
