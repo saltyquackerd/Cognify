@@ -22,7 +22,7 @@ class LLM():
         )
         self.max_tokens=1000
     
-    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'claude', system_prompt: str = None):
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'cerebras', system_prompt: str = None):
         """
         Get response from Cerebras API for a given message with conversation context
         

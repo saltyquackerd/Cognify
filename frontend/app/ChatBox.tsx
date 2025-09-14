@@ -27,7 +27,8 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     messagesByConversation,
     updateConversationLastMessage,
     createOrSelectEmptyConversation,
-    conversations
+    conversations,
+    getQuizForMessage
   } = useStore();
   
   const activeConversation = useMemo(() => {
@@ -215,6 +216,12 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
       updateConversationLastMessage(conversationId, assistantMessage.content);
     } finally {
       setIsLoading(false);
+      // Refocus the input field after sending message
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
     }
   };
 
@@ -243,11 +250,6 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                 <h1 className="text-xl text-gray-900">
                   {activeConversation ? activeConversation.title : 'Cognify'}
                 </h1>
-              {activeConversation && (
-                <p className="text-sm text-gray-600 mt-1">
-                  {activeConversation.lastMessage}
-                </p>
-              )}
             </div>
             <div className="text-right">
               <div className="text-xs text-gray-500">
@@ -303,15 +305,22 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                       
                       {/* Side Popup Trigger Button - Only for assistant messages */}
                       {message.role === 'assistant' && (
-                        <button
-                          onClick={() => handleOpenSidePopup(message)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600 self-end mt-1"
-                          title="Continue this conversation in side panel"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </button>
+                        <div className="flex items-center space-x-1 self-end mt-1">
+                          {getQuizForMessage(message.id) && (
+                            <div className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                              Quiz
+                            </div>
+                          )}
+                          <button
+                            onClick={() => handleOpenSidePopup(message)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600"
+                            title="Continue this conversation in side panel"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                              <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
