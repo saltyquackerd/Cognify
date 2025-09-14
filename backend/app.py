@@ -415,7 +415,8 @@ def get_all_conversations(user_id):
             conversations.append({
                 'id': session_id,
                 'lastMessage': last_message,
-                'timestamp': timestamp
+                'timestamp': timestamp,
+                'isActive': False
             })
         
         # Sort by timestamp (most recent first)
