@@ -1,5 +1,6 @@
 import os
-from flask import Flask, request, jsonify
+import json
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import uuid
 from datetime import datetime
@@ -194,7 +195,7 @@ def create_session(user_id):
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """Handle chat requests with conversation context"""
+    """Handle streaming chat requests with conversation context"""
     try:
         data = request.get_json()
         user_message = data.get('message', '')
@@ -217,32 +218,58 @@ def chat():
         user_message_doc = MessageSchema.create_message_document(user_message, 'user')
         session['messages'].append(user_message_doc)
         
-        # Get response from Cerebras with conversation context
-        chat_response = llm_service.get_chat_response(user_message, session['conversation_history'])
-        
-        # Add AI response to conversation history
-        session['conversation_history'].append({"role": "assistant", "content": chat_response})
-        # Store the chatbot response
-        chatbot_message_doc = MessageSchema.create_message_document(chat_response, 'assistant')
-        session['messages'].append(chatbot_message_doc)
-        
-        # Set title after first user question if title is still empty
-        if not session['title']:
-            summary = f"User message: {user_message}\nChat response: {chat_response}"
-            session['title'] = llm_service.get_title(summary)
-        
-        # Get the message IDs for the response
-        user_message_id = user_message_doc['message_id']
-        chatbot_message_id = chatbot_message_doc['message_id']
-        
-        return jsonify({
-            'session_id': session_id,
-            'user_message_id': user_message_id,
-            'chatbot_message_id': chatbot_message_id,
-            'chat_response': chat_response,
-            'user_id': session['user_id'],
-            'title': session['title']
-        })
+        def generate():
+            """Generate Server-Sent Events for streaming response."""
+            try:
+                # Send initial event with session info
+                yield f"data: {json.dumps({'status': 'started', 'session_id': session_id, 'user_message_id': user_message_doc['message_id']})}\n\n"
+                
+                # Get streaming response from LLM
+                chat_response_stream = llm_service.get_chat_response(message=user_message, conversation_history=session['conversation_history'])
+                
+                # Collect the full response for storage
+                full_response = ""
+                
+                # Stream each chunk of the response
+                for chunk in chat_response_stream:
+                    if chunk:  # Only send non-empty chunks
+                        full_response += chunk
+                        yield f"data: {json.dumps({'status': 'chunk', 'content': chunk})}\n\n"
+                
+                # Handle empty response case
+                if not full_response.strip():
+                    full_response = "I apologize, but I couldn't generate a response. Please try again."
+                    yield f"data: {json.dumps({'status': 'chunk', 'content': full_response})}\n\n"
+                
+                # Add chatbot response to conversation history
+                session['conversation_history'].append({"role": "assistant", "content": full_response})
+                # Store the chatbot response
+                chatbot_message_doc = MessageSchema.create_message_document(full_response, 'assistant')
+                session['messages'].append(chatbot_message_doc)
+                
+                # Set title after first user question if title is still empty
+                if not session['title']:
+                    summary = f"User message: {user_message}\nChat response: {full_response}"
+                    session['title'] = llm_service.get_title(summary)
+                
+                # Send completion event with final data
+                yield f"data: {json.dumps({'status': 'completed', 'chatbot_message_id': chatbot_message_doc['message_id'], 'user_id': session['user_id'], 'title': session['title']})}\n\n"
+                
+            except Exception as e:
+                # Send error event
+                yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+
+        return Response(
+            generate(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Credentials': 'true',
+                'Access-Control-Allow-Headers': 'Content-Type, Accept',
+                'Access-Control-Allow-Origin': '*'
+            }
+        )
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
