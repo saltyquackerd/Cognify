@@ -6,18 +6,12 @@ class UserSchema:
     """User schema based on app.py data structure"""
     
     @staticmethod
-    def create_user_document(user_id: str, username: str = None, email: str = None, google_id: str = None, name: str = None, picture: str = None) -> Dict:
-        """Create a new user document with Google Auth support"""
+    def create_user_document(user_id: str, username: str) -> Dict:
+        """Create a new user document matching app.py structure"""
         return {
             '_id': user_id,
             'username': username,
-            'email': email,
-            'name': name,
-            'picture': picture,
-            'google_id': google_id,
-            'auth_provider': 'google' if google_id else 'local',
             'created_at': datetime.now().isoformat(),
-            'last_login': datetime.now().isoformat(),
             'sessions': []
         }
     

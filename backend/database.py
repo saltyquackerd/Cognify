@@ -59,58 +59,24 @@ class DatabaseService:
         return self.client is not None
     
     # User CRUD operations
-    def create_user(self, username: str = None, email: str = None, google_id: str = None, name: str = None, picture: str = None) -> str:
-        """Create a new user with Google Auth support"""
+    def create_user(self, username: str) -> str:
+        """Create a new user"""
         if not self.is_connected():
             return None
         
         try:
-            # Check if user already exists (by email or google_id)
-            existing_user = None
-            if google_id:
-                existing_user = self.users_collection.find_one({'google_id': google_id})
-            elif email:
-                existing_user = self.users_collection.find_one({'email': email})
-            elif username:
-                existing_user = self.users_collection.find_one({'username': username})
-            
+            # Check if username already exists
+            existing_user = self.users_collection.find_one({'username': username})
             if existing_user:
-                return existing_user['_id']  # Return existing user ID
+                return None  # Username already exists
             
             user_id = str(uuid.uuid4())
-            user_doc = UserSchema.create_user_document(user_id, username, email, google_id, name, picture)
+            user_doc = UserSchema.create_user_document(user_id, username)
             self.users_collection.insert_one(user_doc)
             return user_id
         except Exception as e:
             print(f"Error creating user: {e}")
             return None
-    
-    def get_user_by_google_id(self, google_id: str) -> Optional[Dict]:
-        """Get a user by Google ID"""
-        if not self.is_connected():
-            return None
-        
-        try:
-            user = self.users_collection.find_one({'google_id': google_id})
-            return user
-        except Exception as e:
-            print(f"Error getting user by Google ID: {e}")
-            return None
-    
-    def update_user_login(self, user_id: str) -> bool:
-        """Update user's last login timestamp"""
-        if not self.is_connected():
-            return False
-        
-        try:
-            result = self.users_collection.update_one(
-                {'_id': user_id},
-                {'$set': {'last_login': datetime.now().isoformat()}}
-            )
-            return result.modified_count > 0
-        except Exception as e:
-            print(f"Error updating user login: {e}")
-            return False
     
     def get_user(self, user_id: str) -> Optional[Dict]:
         """Get a user by ID"""

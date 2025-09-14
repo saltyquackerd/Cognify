@@ -101,7 +101,7 @@ export default function MessageList() {
       </div>
 
       {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto px-2">
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
         {filteredConversations.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             {searchQuery ? 'No conversations found' : 'No conversations yet'}
@@ -161,23 +161,6 @@ export default function MessageList() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Logout Button - Frozen at Bottom */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-        <button
-          onClick={() => {
-            localStorage.removeItem('user');
-            localStorage.removeItem('session_id');
-            window.location.reload();
-          }}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Logout
-        </button>
       </div>
 
       {/* Delete Confirmation Modal */}

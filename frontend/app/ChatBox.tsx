@@ -207,6 +207,17 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           </div>
 
           {/* Input Field at Bottom */}
+          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <InputField
+              ref={inputRef}
+              onSendMessage={handleSendMessage}
+              disabled={isLoading}
+              placeholder="Message Cognify..."
+            />
+            </div>
+          </div>
+        </main>
+          {/* Input Field at Bottom */}
           <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-transparent">
             <InputField
               ref={inputRef}
