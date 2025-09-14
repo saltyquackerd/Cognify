@@ -54,7 +54,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     // Don't immediately reset response count - let it be calculated from loaded messages
   }, [messageId]);
 
-  // Ensure quiz exists and ask initial question
+  // Ensure quiz exists; always load messages on open/return; only auto-ask once per quiz
   useEffect(() => {
     console.log('SidePopup useEffect - messageId:', messageId);
     console.log('SidePopup useEffect - quizConversationId:', quizConversationId);
@@ -63,30 +63,24 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     if (quizConversationId) {
       console.log('Quiz exists, setting hasQuiz to true');
       setHasQuiz(true);
-      // Use ref guard to avoid duplicate initial load (e.g., StrictMode double-run)
-      if (!hasAskedForQuizRef.current[quizConversationId] && !isAskingQuestion) {
-        console.log('Loading quiz messages or asking initial question');
-        setIsAskingQuestion(true);
-        hasAskedForQuizRef.current[quizConversationId] = true;
-        (async () => {
-          try {
-            // First try to load existing messages
-            const hasExistingMessages = await loadQuizMessages(quizConversationId);
-            if (!hasExistingMessages) {
-              // No existing messages, ask a new question
-              console.log('No existing messages, asking initial question');
-              await askQuestion(quizConversationId);
-            } else {
-              console.log('Loaded existing quiz messages');
-            }
-            setAskedInitial(true);
-          } catch (e) {
-            console.error('Error loading quiz or asking initial question:', e);
-          } finally {
-            setIsAskingQuestion(false);
+      (async () => {
+        try {
+          // Always load messages when (re)opening this quiz
+          const hasExistingMessages = await loadQuizMessages(quizConversationId);
+          // If no messages yet, auto-ask only once per quiz id
+          if (!hasExistingMessages && !hasAskedForQuizRef.current[quizConversationId] && !isAskingQuestion) {
+            console.log('No existing messages for this quiz; auto-asking initial question');
+            setIsAskingQuestion(true);
+            hasAskedForQuizRef.current[quizConversationId] = true;
+            await askQuestion(quizConversationId);
           }
-        })();
-      }
+          setAskedInitial(true);
+        } catch (e) {
+          console.error('Error loading quiz or asking initial question:', e);
+        } finally {
+          setIsAskingQuestion(false);
+        }
+      })();
     } else {
       console.log('No quiz exists yet, setting hasQuiz to false');
       setHasQuiz(false);

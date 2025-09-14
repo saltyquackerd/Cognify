@@ -285,6 +285,13 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     }
   };
 
+  // Close sidebar when switching to another conversation
+  useEffect(() => {
+    if (sidePopupOpen) {
+      handleCloseSidePopup();
+    }
+  }, [selectedConversationId]);
+
   const handleQuizResponseCountChange = (count: number) => {
     console.log('handleQuizResponseCountChange called with count:', count);
     console.log('Current isQuizBlocking state:', isQuizBlocking);
