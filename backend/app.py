@@ -118,6 +118,8 @@ def create_session(user_id):
     try:
         if user_id not in users:
             return jsonify({'error': 'User not found'}), 404
+        data = request.get_json()
+        isStrict = data.get('isStrict', False)
         
         # Create new session
         session_id = str(uuid.uuid4())
@@ -128,7 +130,8 @@ def create_session(user_id):
             'title': '',
             'messages': [],
             'quizzes': [],
-            'conversation_history': []
+            'conversation_history': [],
+            'isStrict': isStrict
         }
         
         # Add session to user
@@ -572,7 +575,7 @@ def get_conversation_messages_endpoint(conv_id):
             return jsonify({'error': 'Conversation not found'}), 404
             
         messages = get_conversation_messages(conv_id)
-        return jsonify(messages)
+        return jsonify({'messages': messages, 'isStrict': sessions[conv_id].get('isStrict', False)})
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

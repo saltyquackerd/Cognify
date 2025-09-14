@@ -106,14 +106,14 @@ class DatabaseService:
             return False
     
     # Session CRUD operations
-    def create_session(self, user_id: str) -> str:
+    def create_session(self, user_id: str, isStrict: bool = False) -> str:
         """Create a new session"""
         if not self.is_connected():
             return None
         
         try:
             session_id = str(uuid.uuid4())
-            session_doc = SessionSchema.create_session_document(session_id, user_id)
+            session_doc = SessionSchema.create_session_document(session_id, user_id, isStrict)
             self.sessions_collection.insert_one(session_doc)
             
             # Add session to user's sessions list
