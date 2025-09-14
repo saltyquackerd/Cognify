@@ -69,6 +69,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   }, [currentMessages, isLoading]);
   const [sidePopupOpen, setSidePopupOpen] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [currentSidePopupWidth, setCurrentSidePopupWidth] = useState(384);
   
   console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
@@ -115,7 +116,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     setIsLoading(true);
 
     try {
-      // Send message to backend
+      // Send message to backend with streaming
       const response = await fetch('http://localhost:5000/api/chat', {
         method: 'POST',
         headers: {
@@ -142,12 +143,65 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
         conversationId: conversationId,
       };
       
-      addMessage(assistantMessage);
+      addMessage(Message);
       updateConversationLastMessage(conversationId, assistantMessage.content);
       
       // Update conversation title if it was generated
       if (data.title && data.title !== 'New conversation') {
         useStore.getState().updateConversation(conversationId, { title: data.title });
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessageId = '';
+      let fullResponse = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.status === 'started') {
+                  // Create initial assistant message
+                  assistantMessageId = data.user_message_id + '_assistant';
+                  const assistantMessage: Message = {
+                    id: assistantMessageId,
+                    content: '',
+                    role: 'assistant',
+                    timestamp: new Date(),
+                    conversationId: selectedConversationId,
+                  };
+                  addMessage(assistantMessage);
+                } else if (data.status === 'chunk') {
+                  // Stream content to the assistant message
+                  fullResponse += data.content;
+                  useStore.getState().updateMessageContent(assistantMessageId, fullResponse);
+                  updateConversationLastMessage(selectedConversationId, fullResponse);
+                } else if (data.status === 'completed') {
+                  // Finalize the message
+                  assistantMessageId = data.chatbot_message_id;
+                  useStore.getState().updateMessageId(assistantMessageId, data.chatbot_message_id);
+                  
+                  // Update conversation title if it was generated
+                  if (data.title && data.title !== 'New conversation') {
+                    useStore.getState().updateConversation(selectedConversationId, { title: data.title });
+                  }
+                } else if (data.status === 'error') {
+                  throw new Error(data.error);
+                }
+              } catch (parseError) {
+                console.error('Error parsing SSE data:', parseError);
+              }
+            }
+          }
+        }
       }
       
     } catch (error) {
@@ -168,15 +222,17 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     }
   };
 
-  const handleOpenSidePopup = (message: string) => {
+  const handleOpenSidePopup = (message: Message) => {
     console.log('Opening side popup with message:', message);
-    setPopupMessage(message);
+    setPopupMessage(message.content);
+    setSelectedMessageId(message.id);
     setSidePopupOpen(true);
   };
 
   const handleCloseSidePopup = () => {
     setSidePopupOpen(false);
     setPopupMessage('');
+    setSelectedMessageId(null);
   };
 
   return (
@@ -252,7 +308,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                       {/* Side Popup Trigger Button - Only for assistant messages */}
                       {message.role === 'assistant' && (
                         <button
-                          onClick={() => handleOpenSidePopup(message.content)}
+                          onClick={() => handleOpenSidePopup(message)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600 self-end mt-1"
                           title="Continue this conversation in side panel"
                         >
@@ -304,6 +360,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           initialMessage={popupMessage}
           title="Check Your Recall"
           onWidthChange={setCurrentSidePopupWidth}
+          messageId={selectedMessageId}
         />
       )}
     </div>

@@ -3,6 +3,7 @@ import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 from cerebras.cloud.sdk import Cerebras
+import anthropic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -13,10 +14,15 @@ class LLM():
     def __init__(self):
         self.default_cerebras_model = "llama-4-scout-17b-16e-instruct"
         self.cerebras_client = Cerebras(
-            api_key=os.environ.get("CEREBRAS_API_KEY"),
+            api_key=os.environ.get("CEREBRAS_API_KEY")
         )
+        self.default_anthropic_model = 'claude-sonnet-4-20250514'
+        self.anthropic_client = anthropic.Anthropic(
+            api_key=os.environ.get("CLAUDE_API_KEY")
+        )
+        self.max_tokens=1000
     
-    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None):
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'claude', system_prompt: str = None):
         """
         Get response from Cerebras API for a given message with conversation context
         
@@ -28,49 +34,56 @@ class LLM():
         Returns:
             str: AI response or error message
         """
-        if not self.cerebras_client.api_key:
-            return "Error: CEREBRAS_API_KEY not configured"
         
-        model = model or self.default_cerebras_model
+        if model_type == 'cerebras':
+            if not self.cerebras_client.api_key:
+                yield "Error: CEREBRAS_API_KEY not configured"
+            
+            model = model or self.default_cerebras_model
 
-        # headers = {
-        #     "Authorization": f"Bearer {self.api_key}",
-        #     "Content-Type": "application/json"
-        # }
+        elif model_type == 'claude' or model_type == 'anthropic':
+            if not self.anthropic_client.api_key:
+                yield "Error: CLAUDE_API_KEY not configured"
+            
+            model = model or self.default_anthropic_model
         
-        # Build messages array with conversation history
         messages = []
         if conversation_history:
             messages.extend(conversation_history)
         
-        # Add current message
         messages.append({"role": "user", "content": message})
-        
-        # data = {
-        #     "model": model,
-        #     "messages": messages,
-        #     "max_tokens": 500,
-        #     "temperature": 0.7
-        # }
+        print(messages)
         
         try:
-            stream = self.cerebras_client.chat.completions.create(
-                messages=messages,
-                model=model,
-                stream=True
-            )
-        
-            # Collect the streamed response into a single string
-            response = ""
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    response += chunk.choices[0].delta.content
+            if model_type == 'cerebras':
+                stream = self.cerebras_client.chat.completions.create(
+                    messages=messages,
+                    model=model,
+                    stream=True
+                )
+                for chunk in stream:
+                    if chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+
+            elif model_type == 'anthropic' or model_type == 'claude':
+                system_prompt = system_prompt or 'You are a helpful AI Assistant.'
+
+                with self.anthropic_client.messages.stream(
+                    max_tokens=self.max_tokens,
+                    messages=messages,
+                    model=model,
+                    system=system_prompt or "You are a helpful AI assistant."
+                ) as stream:
+                    for chunk in stream.text_stream:
+                        if chunk: 
+                            yield chunk
+            else:
+                yield f'Error: Cerebras or Anthropic model type expected.'
             
-            return response
         except requests.exceptions.RequestException as e:
-            return f"Error communicating with Cerebras API: {str(e)}"
+            yield f"Error communicating with Cerebras API: {str(e)}"
     
-    def generate_quiz_questions(self, response_text: str, user_highlight: str = None, conversation_history: List[Dict] = None, past_questions : List[Dict] = None):
+    def generate_quiz_questions(self, response_text: str, user_highlight: str = None, conversation_history: List[Dict] = None):
         """
         Generate a single long-answer question based on response text
         
@@ -90,9 +103,6 @@ class LLM():
                             Do not repeat past questions.
                             No examples. No answers. No special tokens"""
 
-        if past_questions is not None:
-            past_qs = [q['content'] for q in past_questions]
-
         user_prompt = f"""CONTEXT:
                         {response_text}
 
@@ -105,31 +115,30 @@ class LLM():
         
         conversation = conversation_history or list()
 
-        conversation.append({"role": "system", "content": system_prompt})
         conversation.append({"role": "user", "content": user_prompt})
 
-        return self.get_chat_response(system_prompt, conversation_history = conversation)
+        return self.get_chat_response(user_prompt, conversation_history = conversation, model_type = 'claude', system_prompt = system_prompt)
     
     def evaluate_answer(self, conversation_history : List[Dict], question: str, user_answer: str):
         """
         Returns evaluation of a long-answer response using LLM
         """
-        system_prompt = f"""
-                        You are an impartial grader.
-                        Evaluate relative to conversation history, do not use outside knowledge.
-                        Produce a concise evaluation of the USER's latest answer to the ASSISTANT's latest question.
-                        Prefer evidence quotes from the history rather than long explanations.
-                        Address the student directly using 'you' instead of 'user'.
-                        Highlight what the user did well and praise it.  
-                        Point out any missing or incorrect elements, and briefly explain them to improve understanding.  
-                        Do not include numeric scores or grades.  
-                        Focus on helping the student learn.  
-                        """
+        prompt = f"""
+                    You are an impartial grader.
+                    Evaluate relative to conversation history, do not use outside knowledge.
+                    Produce a concise evaluation of the USER's latest answer to the ASSISTANT's latest question.
+                    Prefer evidence quotes from the history rather than long explanations.
+                    Address the student directly using 'you' instead of 'user'.
+                    Highlight what the user did well and praise it.  
+                    Point out any missing or incorrect elements, and briefly explain them to improve understanding.  
+                    Do not include numeric scores or grades.  
+                    Focus on helping the student learn.  
+                    """
         
         if conversation_history is None:
             return f"Error: Conversation history (assistant question and user answer) expected"
         
-        return self.get_chat_response(system_prompt, conversation_history = conversation_history)
+        return self.get_chat_response(prompt, conversation_history = conversation_history, model_type = 'claude', system_prompt = prompt)
 
     def get_title(self, response : str):
         """
@@ -193,7 +202,7 @@ def main():
     print(' == QUIZ QUESTION == ')
     user_highlight = 'priority queue'
     user_highlight = None
-    quiz_gen = llm.generate_quiz_questions(response, user_highlight, history, None)
+    quiz_gen = llm.generate_quiz_questions(response, user_highlight, history)
     response = ''
     for s in quiz_gen:
         response += s
