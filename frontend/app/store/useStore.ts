@@ -5,7 +5,8 @@ export interface Conversation {
   title: string;
   lastMessage: string;
   timestamp: Date;
-  isActive?: boolean;
+  isActive: boolean;
+  quizMode?: 'strict' | 'unsupervised';
 }
 
 export interface Message {
@@ -36,7 +37,7 @@ interface StoreState {
   setConversations: (conversations: Conversation[]) => void;
   loadConversations: (userId: string) => Promise<void>;
   loadMessagesForConversation: (conversationId: string) => Promise<void>;
-  createNewConversation: (userId: string) => Promise<Conversation>;
+  createNewConversation: (userId: string, quizMode?: 'strict' | 'unsupervised') => Promise<Conversation>;
   linkMessageToQuiz: (messageId: string, quizConversationId: string) => void;
   getQuizForMessage: (messageId: string) => string | null;
   openOrCreateQuizForMessage: (message: Message, userId: string, selectQuiz?: boolean) => Promise<Conversation>;
@@ -183,13 +184,16 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  createNewConversation: async (userId) => {
+  createNewConversation: async (userId, quizMode = 'unsupervised') => {
     try {
       const response = await fetch(`http://localhost:5000/api/users/${userId}/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          quiz_mode: quizMode
+        }),
       });
       
       if (!response.ok) {
@@ -204,7 +208,8 @@ export const useStore = create<StoreState>((set, get) => ({
         title: 'New conversation',
         lastMessage: 'Start a new conversation...',
         timestamp: new Date(sessionData.created_at),
-        isActive: true
+        isActive: true,
+        quizMode: quizMode
       };
       
       // Add the new conversation to the store

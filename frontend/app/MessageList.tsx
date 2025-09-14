@@ -3,16 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, Conversation } from './store/useStore';
+import QuizModeModal from './QuizModeModal';
 
 export default function MessageList() {
   const router = useRouter();
   const { 
     conversations, 
-    addConversation, 
-    selectConversation, 
-    deleteConversation,
-    loadConversations,
-    createOrSelectEmptyConversation
+    selectedConversationId, 
+    deleteConversation, 
+    selectConversation,
+    addConversation,
+    createOrSelectEmptyConversation,
+    findEmptyConversation,
+    updateConversation,
+    createNewConversation,
+    loadConversations
   } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -47,10 +52,24 @@ export default function MessageList() {
     setShowDeleteConfirm(conversationId);
   };
 
-  const handleNewChat = async () => {
+  const [showQuizModeModal, setShowQuizModeModal] = useState(false);
+
+  const handleNewChat = () => {
+    setShowQuizModeModal(true);
+  };
+
+  const handleQuizModeSelect = async (mode: 'strict' | 'unsupervised') => {
     try {
-      console.log('MessageList - Creating or selecting empty conversation');
-      await createOrSelectEmptyConversation('1'); // Using user ID '1' for now
+      console.log('MessageList - Creating conversation with mode:', mode);
+      const emptyConv = findEmptyConversation();
+      if (emptyConv) {
+        // Update existing empty conversation with quiz mode
+        updateConversation(emptyConv.id, { quizMode: mode });
+        selectConversation(emptyConv.id);
+      } else {
+        // Create new conversation with quiz mode
+        await createNewConversation('1', mode);
+      }
     } catch (error) {
       console.error('Failed to create new conversation:', error);
       // Fallback to local creation if backend fails
@@ -59,7 +78,8 @@ export default function MessageList() {
         title: 'New conversation',
         lastMessage: 'Start a new conversation...',
         timestamp: new Date(),
-        isActive: true
+        isActive: true,
+        quizMode: mode
       };
       addConversation(newConversation);
     }
@@ -245,53 +265,49 @@ export default function MessageList() {
         </>
       )}
 
-      {/* Delete Confirmation Popup with Blur */}
+      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <>
-          {/* Blur overlay */}
-          <div className="fixed inset-0 backdrop-blur-sm z-40" />
-          
-          {/* Popup */}
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 max-w-md w-full mx-4 transform transition-all duration-200 scale-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Delete conversation
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    This action cannot be undone
-                  </p>
-                </div>
+        <div className="fixed inset-0 backdrop-blur-md bg-white/30 flex items-center justify-center z-50">
+          <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-white/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
               </div>
-              
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to delete this conversation? All messages and data will be permanently removed.
-              </p>
-              
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setShowDeleteConfirm(null)}
-                  className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDeleteConfirm(showDeleteConfirm)}
-                  className="px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                >
-                  Delete conversation
-                </button>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Conversation</h3>
               </div>
             </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this conversation? All messages and data will be permanently removed.
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="px-4 py-2 text-gray-700 bg-gray-100/80 hover:bg-gray-200/80 backdrop-blur-sm rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteConfirm(showDeleteConfirm)}
+                className="px-4 py-2 bg-red-600/90 hover:bg-red-700/90 backdrop-blur-sm text-white rounded-lg font-medium transition-colors"
+              >
+                Delete
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
+      
+      {/* Quiz Mode Selection Modal */}
+      <QuizModeModal
+        isOpen={showQuizModeModal}
+        onClose={() => setShowQuizModeModal(false)}
+        onSelectMode={handleQuizModeSelect}
+      />
     </div>
   );
 }
