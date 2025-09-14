@@ -332,16 +332,13 @@ def create_quiz_thread(session_id):
             'start_assistant_message': start_assistant_message,
             'prev_context': prev_context,
             'created_at': datetime.now().isoformat(),
-            'messages': (
-                [
-                    {
-                        'message_id': start_user_message['message_id'],
-                        'message': start_user_message['message'],
-                        'timestamp': start_user_message['timestamp'],
-                        'role': 'user'
-                    }
-                ] if start_user_message else []
-            ) + [
+            'messages': [
+                {
+                    'message_id': start_user_message['message_id'],
+                    'message': start_user_message['message'],
+                    'timestamp': start_user_message['timestamp'],
+                    'role': 'user'
+                },
                 {
                     'message_id': start_assistant_message['message_id'],
                     'message': start_assistant_message['message'],
