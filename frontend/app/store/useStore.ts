@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { API_URLS } from '../lib/api';
+import { API_URLS } from '../../lib/api';
 
 export interface Conversation {
   id: string;
