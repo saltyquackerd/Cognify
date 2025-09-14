@@ -79,6 +79,8 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   const [currentSidePopupWidth, setCurrentSidePopupWidth] = useState(384);
   const [isQuizBlocking, setIsQuizBlocking] = useState(false);
   const [quizResponseCount, setQuizResponseCount] = useState(0);
+  const [conversationTags, setConversationTags] = useState<{[conversationId: string]: string[]}>({});
+  const [isGeneratingTags, setIsGeneratingTags] = useState(false);
   
   console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
   console.log('ChatBox render - selectedConversationId:', selectedConversationId);
@@ -324,42 +326,84 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                 </h1>
             </div>
             <div className="flex items-center">
-              {/* Generate Tags Button */}
+              {/* Tags Section */}
               {activeConversation && (
-                <button
-                  onClick={async () => {
-                    if (!activeConversation) return;
-                    
-                    try {
-                      const response = await fetch(`http://localhost:5000/api/sessions/${activeConversation.id}/tags`, {
-                        method: 'GET',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                      });
+                <div className="flex items-center">
+                  {conversationTags[activeConversation.id] ? (
+                    /* Show Tags */
+                    <div className="flex flex-wrap gap-1 max-w-md">
+                      {conversationTags[activeConversation.id].map((tag, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-200"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Show Generate Tags Button */
+                    <button
+                      onClick={async () => {
+                        if (!activeConversation) return;
+                        
+                        setIsGeneratingTags(true);
+                        try {
+                          console.log('Requesting tags for session ID:', activeConversation.id);
+                          console.log('Full URL:', `http://localhost:5000/api/sessions/${activeConversation.id}/tags`);
+                          
+                          const response = await fetch(`http://localhost:5000/api/sessions/${activeConversation.id}/tags`, {
+                            method: 'GET',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                          });
 
-                      if (!response.ok) {
-                        throw new Error('Failed to generate tags');
-                      }
+                          if (!response.ok) {
+                            console.error('Response not OK:', response.status, response.statusText);
+                            const errorText = await response.text();
+                            console.error('Error response body:', errorText);
+                            throw new Error(`Failed to generate tags: ${response.status} ${response.statusText}`);
+                          }
 
-                      const tags = await response.json();
-                      console.log('Generated tags for conversation:', activeConversation.id, tags);
-                      
-                      // TODO: Display tags in UI or store them in state
-                      // For now, just log them to console
-                    } catch (error) {
-                      console.error('Error generating tags:', error);
-                      // TODO: Show error message to user
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200 flex items-center space-x-1"
-                  title="Generate tags for this conversation"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  <span>Generate Tags</span>
-                </button>
+                          const data = await response.json();
+                          const tags = data.tags || [];
+                          console.log('Generated tags for conversation:', activeConversation.id, tags);
+                          
+                          // Store tags in state
+                          setConversationTags(prev => ({
+                            ...prev,
+                            [activeConversation.id]: tags
+                          }));
+                        } catch (error) {
+                          console.error('Error generating tags:', error);
+                        } finally {
+                          setIsGeneratingTags(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200 flex items-center space-x-1"
+                      title="Generate tags for this conversation"
+                      disabled={isGeneratingTags}
+                    >
+                      {isGeneratingTags ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                          <span>Generate Tags</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
