@@ -65,6 +65,8 @@ class LLM():
                         yield chunk.choices[0].delta.content
 
             elif model_type == 'anthropic' or model_type == 'claude':
+                system_prompt = system_prompt or 'You are a helpful AI Assistant.'
+
                 with self.anthropic_client.messages.stream(
                     max_tokens=self.max_tokens,
                     messages=messages,
@@ -113,7 +115,6 @@ class LLM():
         
         conversation = conversation_history or list()
 
-        # conversation.append({"role": "system", "content": system_prompt})
         conversation.append({"role": "user", "content": user_prompt})
 
         return self.get_chat_response(user_prompt, conversation_history = conversation, model_type = 'claude', system_prompt = system_prompt)
