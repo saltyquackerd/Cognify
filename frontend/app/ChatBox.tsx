@@ -320,7 +320,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           <div className="flex items-center justify-between">
             <div>
                 <h1 className="text-xl text-gray-900">
-                  {activeConversation ? activeConversation.title : 'Cognify'}
+                  {activeConversation ? activeConversation.title : ''}
                 </h1>
             </div>
             <div className="flex items-center">
@@ -351,17 +351,29 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
             {/* Messages Container */}
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
             {currentMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-                <div className="max-w-md">
-                  <h2 className="text-4xl text-gray-900 mb-4 animate-fade-in-up">
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center mt-16">
+                <div className="w-full max-w-4xl">
+                  <h2 className="text-4xl text-gray-900 mb-2 animate-fade-in-up">
                     Welcome to <span className="relative inline-block px-3 py-2">
                       <span className="relative z-10 text-white animate-pulse-text">Cognify</span>
                       <span className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 transform rounded-4xl -skew-y-[2deg] opacity-80 shadow-lg animate-gradient-shift"></span>
                     </span>
                   </h2>
-                  <p className="text-gray-600 mb-8">
-                    {selectedConversation ? 'Start chatting in this conversation.' : 'Select a conversation from the sidebar to start learning.'}
+                  <p className="text-gray-600 mb-2">
+                    {selectedConversation ? 'Start chatting in this conversation.' : ''}
                   </p>
+                  
+                  {/* Search bar right below welcome message - wide like ChatGPT */}
+                  <div className="w-full">
+                    <InputField
+                      ref={inputRef}
+                      onSendMessage={handleSendMessage}
+                      disabled={isQuizBlocking}
+                      placeholder={isQuizBlocking ? "Complete the quiz to continue..." : "Message Cognify..."}
+                      sidePopupOpen={sidePopupOpen}
+                      key={`input-${isQuizBlocking}`}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
@@ -421,17 +433,19 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Field at Bottom */}
-          <div className="flex-shrink-0 border-t border-gray-200 bg-transparent">
-            <InputField
-              ref={inputRef}
-              onSendMessage={handleSendMessage}
-              disabled={isQuizBlocking}
-              placeholder={isQuizBlocking ? "Complete the quiz to continue..." : "Message Cognify..."}
-              sidePopupOpen={sidePopupOpen}
-              key={`input-${isQuizBlocking}`}
-            />
+          {/* Input Field at Bottom - Only when conversation is active */}
+          {currentMessages.length > 0 && (
+            <div className="flex-shrink-0 border-t border-gray-200 bg-transparent">
+              <InputField
+                ref={inputRef}
+                onSendMessage={handleSendMessage}
+                disabled={isQuizBlocking}
+                placeholder={isQuizBlocking ? "Complete the quiz to continue..." : "Message Cognify..."}
+                sidePopupOpen={sidePopupOpen}
+                key={`input-${isQuizBlocking}`}
+              />
             </div>
+          )}
         </div>
       </main>
       </div>
