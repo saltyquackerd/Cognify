@@ -9,7 +9,6 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   Controls,
-  MiniMap,
   Background,
   BackgroundVariant,
   Connection,
@@ -26,7 +25,7 @@ const CustomNode = ({ data }: { data: { label: string; color?: string; textColor
   // Calculate dynamic size based on text content with better spacing
   const text = data.label || '';
   const words = text.split(' ');
-  const maxWordLength = Math.max(...words.map((word: string) => word.length));
+  const maxWordLength = words.length > 0 ? Math.max(...words.map((word: string) => word.length)) : 0;
   const wordCount = words.length;
   
   // Calculate optimal rectangle size with better proportions
@@ -63,10 +62,9 @@ const CustomNode = ({ data }: { data: { label: string; color?: string; textColor
       />
       
       <Handle
-        type="target"
-        position={Position.Left}
-        className="w-4 h-4 !bg-white !border-2 !border-slate-300 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm"
-        style={{ left: -8 }}
+        type="source"
+        position={Position.Right}
+        className="w-2 h-2 !bg-white !border-2 !border-slate-300 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm"
       />
       
       <div 
@@ -95,10 +93,9 @@ const CustomNode = ({ data }: { data: { label: string; color?: string; textColor
       </div>
       
       <Handle
-        type="source"
-        position={Position.Right}
-        className="w-4 h-4 !bg-white !border-2 !border-slate-300 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm"
-        style={{ right: -8 }}
+        type="target"
+        position={Position.Left}
+        className="w-2 h-2 !bg-white !border-2 !border-slate-300 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm"
       />
       
       {/* Subtle hover effect overlay */}
@@ -242,7 +239,7 @@ export default function KnowledgeGraphPage() {
             console.log(`Creating node ${index}: ${topic}`);
           }
           const degree = nodeDegrees.get(topic) || 0;
-          const maxDegree = Math.max(...Array.from(nodeDegrees.values()));
+          const maxDegree = nodeDegrees.size > 0 ? Math.max(...Array.from(nodeDegrees.values())) : 0;
           
           // Web-like positioning: create multiple layers radiating outward
           const centralityFactor = maxDegree > 0 ? degree / maxDegree : 0;
@@ -281,7 +278,7 @@ export default function KnowledgeGraphPage() {
           const colorScheme = getNodeColor(topic);
           return {
             id: topic,
-            type: 'customNode', // Use customNode consistently
+            type: 'customNode',
             position: { x, y },
             data: {
               label: topic,
@@ -309,8 +306,8 @@ export default function KnowledgeGraphPage() {
           // Use consistent edge styling for better visibility
           const strokeWidth = Math.max(1.5, Math.min(3, 1.5 + edgeStrength * 0.2));
           
-          // Use smooth curved edges with elegant styling
-          const edgeType = 'smoothstep';
+          // Use straight edges with elegant styling
+          const edgeType = 'straight';
           
           return {
             id: `edge-${index}`,
@@ -386,7 +383,7 @@ export default function KnowledgeGraphPage() {
             source: 'ai', 
             target: 'ml', 
             label: 'includes',
-            type: 'smoothstep',
+            type: 'straight',
             animated: false,
             style: { 
               stroke: '#94a3b8', 
@@ -447,40 +444,13 @@ export default function KnowledgeGraphPage() {
     }
     setSelectedNode(node);
     
-    // Get connected node IDs
-    const connectedNodeIds = new Set<string>();
+    // Get connected edge IDs for highlighting
     const connectedEdgeIds = new Set<string>();
-    
     edges.forEach(edge => {
       if (edge.source === node.id || edge.target === node.id) {
         connectedEdgeIds.add(edge.id);
-        connectedNodeIds.add(edge.source === node.id ? edge.target : edge.source);
       }
     });
-    
-    // Update nodes with highlighting (keep original gradients, enhance selected nodes)
-    setNodes(currentNodes => 
-      currentNodes.map(n => {
-        const isSelected = n.id === node.id;
-        const isConnected = connectedNodeIds.has(n.id);
-        
-        return {
-          ...n,
-          data: {
-            ...n.data,
-            gradient: n.data.originalGradient, // Keep original gradients
-            textColor: n.data.originalTextColor // Keep original text color
-          },
-          style: {
-            opacity: isSelected || isConnected ? 1 : 0.4,
-            transform: isSelected ? 'scale(1.05)' : 'scale(1)',
-            boxShadow: isSelected 
-              ? '0 12px 40px rgba(0, 0, 0, 0.15), 0 6px 20px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-              : '0 8px 32px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-          }
-        };
-      })
-    );
     
     // Update edges with highlighting
     setEdges(currentEdges =>
@@ -490,33 +460,15 @@ export default function KnowledgeGraphPage() {
           ...e.style,
           stroke: connectedEdgeIds.has(e.id) ? '#6366f1' : '#94a3b8',
           strokeWidth: connectedEdgeIds.has(e.id) ? 3 : 2.5,
-          opacity: connectedEdgeIds.has(e.id) ? 1 : 0.5,
-          filter: connectedEdgeIds.has(e.id) ? 'drop-shadow(0 4px 8px rgba(99, 102, 241, 0.3))' : 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
+          opacity: connectedEdgeIds.has(e.id) ? 1 : 0.5
         }
       }))
     );
-  }, [edges, setNodes, setEdges]);
+  }, [edges, setEdges]);
 
   // Handle clearing selection when clicking on empty space
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
-    
-    // Reset all nodes to original gradients
-    setNodes(currentNodes => 
-      currentNodes.map(n => ({
-        ...n,
-        data: {
-          ...n.data,
-          gradient: n.data.originalGradient,
-          textColor: n.data.originalTextColor
-        },
-        style: {
-          opacity: 1,
-          transform: 'scale(1)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-        }
-      }))
-    );
     
     // Reset all edges to original styles
     setEdges(currentEdges =>
@@ -526,36 +478,16 @@ export default function KnowledgeGraphPage() {
           ...e.style,
           stroke: '#94a3b8',
           strokeWidth: 2.5,
-          opacity: 0.7,
-          filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
+          opacity: 0.7
         }
       }))
     );
-  }, [setNodes, setEdges]);
+  }, [setEdges]);
 
   // Initialize React Flow instance
   const onInit = useCallback((reactFlowInstance: ReactFlowInstance) => {
     reactFlowRef.current = reactFlowInstance;
   }, []);
-
-  // Handle adding new nodes
-  const onAddNode = useCallback(() => {
-    const colorScheme = getNodeColor('New Concept');
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'customNode',
-      position: { x: Math.random() * 400 + 200, y: Math.random() * 400 + 200 },
-      data: {
-        label: 'New Concept',
-        gradient: colorScheme.gradient,
-        textColor: colorScheme.textColor,
-        category: 'Custom',
-        originalGradient: colorScheme.gradient,
-        originalTextColor: colorScheme.textColor
-      }
-    };
-    setNodes((nds) => [...nds, newNode]);
-  }, [setNodes]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -624,20 +556,6 @@ export default function KnowledgeGraphPage() {
               </h1>
               <p className="text-slate-500 text-sm font-medium mt-1">Interactive concept visualization</p>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={onAddNode}
-              className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-            >
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Concept
-              </span>
-            </button>
           </div>
         </div>
       </header>
@@ -728,12 +646,10 @@ export default function KnowledgeGraphPage() {
                 className="bg-transparent"
                 style={{ width: '100%', height: '100%', minHeight: '500px' }}
                 defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+                nodesDraggable={true}
+                nodesConnectable={true}
               >
             <Controls className="!bg-white/90 !backdrop-blur-xl !border !border-slate-200/50 !rounded-2xl !shadow-xl" />
-            <MiniMap 
-              className="!bg-white/90 !backdrop-blur-xl !border !border-slate-200/50 !rounded-2xl !shadow-xl"
-              nodeColor={(node) => node.data?.gradient || node.data?.color || '#6366f1'}
-            />
             <Background 
               variant={BackgroundVariant.Dots} 
               gap={40} 
@@ -763,10 +679,6 @@ export default function KnowledgeGraphPage() {
                 <li className="flex items-center gap-4">
                   <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
                   <span>Use controls to zoom and navigate</span>
-                </li>
-                <li className="flex items-center gap-4">
-                  <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
-                  <span>Add new concepts with the button above</span>
                 </li>
               </ul>
             </Panel>
