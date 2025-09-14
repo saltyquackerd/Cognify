@@ -372,7 +372,7 @@ def create_quiz_thread(session_id):
 
         # Build previous context; if user message is missing, use full conversation history as-is
         if start_user_message:
-            prev_context = combine_session_and_quiz_history(messages, start_user_message, sessions[session_id]['conversation_history'])
+            prev_context = combine_session_and_quiz_history(messages, start_user_message)
         else:
             prev_context = sessions[session_id]['conversation_history'][:]
         
