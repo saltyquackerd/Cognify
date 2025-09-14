@@ -21,7 +21,6 @@ class LLM():
             api_key=os.environ.get("CLAUDE_API_KEY")
         )
         self.max_tokens=1000
-        self.graph = GraphIngestor()
     
     def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'cerebras', system_prompt: str = None, isStreaming : bool = True):
         """
@@ -86,7 +85,7 @@ class LLM():
                             if chunk: 
                                 yield chunk
                 else:
-                    return client.messages.create(max_tokens=self.max_tokens,
+                    return self.anthropic_client.messages.create(max_tokens=self.max_tokens,
                         messages=messages,
                         model=model,
                         system=system_prompt
@@ -181,9 +180,6 @@ class LLM():
             title += s
 
         return title
-    
-    def summarize(self, conversation_history : List[Dict]):
-        get_chat_response()
 
 
 def main():
