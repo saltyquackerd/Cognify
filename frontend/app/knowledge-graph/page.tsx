@@ -22,30 +22,76 @@ import 'reactflow/dist/style.css';
 
 // Custom node component
 const CustomNode = ({ data }: { data: any }) => {
-  const size = data.size || 60;
-  const radius = size / 2;
+  // Calculate dynamic size based on text content
+  const text = data.label || '';
+  const words = text.split(' ');
+  const maxWordLength = Math.max(...words.map((word: string) => word.length));
+  
+  // More generous text width calculation to prevent cutting
+  const maxTextWidth = 80; // Increased maximum width
+  const textWidth = Math.min(maxTextWidth, Math.max(50, maxWordLength * 8)); // Increased multiplier
+  
+  // More conservative line estimation to ensure no cutting
+  const avgCharsPerLine = Math.floor(textWidth / 5.5); // More conservative char estimate
+  const estimatedLines = Math.max(1, Math.ceil(text.length / avgCharsPerLine));
+  const lineHeight = 18; // Increased line height for better spacing
+  const textHeight = estimatedLines * lineHeight;
+  
+  // More generous padding to ensure no cutting
+  const minSize = Math.max(textWidth, textHeight) + 24; // Increased padding
+  const size = Math.max(70, minSize); // Increased minimum size
   
   return (
     <div 
-      className="shadow-md backdrop-blur-sm relative flex items-center justify-center"
+      className="relative flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group"
       style={{ 
         width: size,
         height: size,
         borderRadius: '50%',
-        backgroundColor: data.color || '#ffffff',
-        color: data.textColor || '#374151',
-        border: 'none',
-        opacity: 0.8
+        background: data.gradient || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: data.textColor || '#ffffff',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        boxShadow: `
+          0 8px 32px rgba(0, 0, 0, 0.1),
+          0 2px 8px rgba(0, 0, 0, 0.05),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.1)
+        `,
+        position: 'relative',
+        overflow: 'hidden'
       }}
     >
+      {/* Animated background overlay */}
+      <div 
+        className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300"
+        style={{
+          background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%)'
+        }}
+      />
       <Handle
         type="target"
         position={Position.Left}
         className="w-3 h-3 !bg-gray-400"
         style={{ left: -6 }}
       />
-      <div className="text-center">
-        <div className="font-medium text-xs leading-tight">{data.label}</div>
+      <div 
+        className="text-center px-4 relative z-10"
+        style={{ 
+          maxWidth: `${textWidth}px`,
+          width: `${textWidth}px`,
+          minHeight: `${textHeight}px`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word'
+        }}
+      >
+        <div className="font-semibold text-xs leading-relaxed break-words whitespace-normal tracking-wide drop-shadow-sm hyphens-auto">
+          {data.label}
+        </div>
       </div>
       <Handle
         type="source"
@@ -61,17 +107,17 @@ const nodeTypes = {
   customNode: CustomNode,
 };
 
-// Helper function to assign colors to nodes based on topic
-const getNodeColor = (topic: string): string => {
-  const colors = [
-    '#E0E7FF', // Light blue
-    '#D1FAE5', // Light green
-    '#F3E8FF', // Light purple
-    '#FEF3C7', // Light yellow
-    '#FED7D7', // Light red
-    '#E6FFFA', // Light teal
-    '#FFF5F5', // Light pink
-    '#F0FDF4', // Light lime
+// Tame, cohesive color palette with muted tones
+const getNodeColor = (topic: string): { gradient: string; textColor: string } => {
+  const colorSchemes = [
+    { gradient: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)', textColor: '#3730a3' },
+    { gradient: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', textColor: '#0c4a6e' },
+    { gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', textColor: '#14532d' },
+    { gradient: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)', textColor: '#713f12' },
+    { gradient: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)', textColor: '#7f1d1d' },
+    { gradient: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)', textColor: '#831843' },
+    { gradient: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', textColor: '#334155' },
+    { gradient: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)', textColor: '#581c87' },
   ];
   
   // Simple hash function to consistently assign colors
@@ -79,7 +125,7 @@ const getNodeColor = (topic: string): string => {
   for (let i = 0; i < topic.length; i++) {
     hash = topic.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return colors[Math.abs(hash) % colors.length];
+  return colorSchemes[Math.abs(hash) % colorSchemes.length];
 };
 
 export default function KnowledgeGraphPage() {
@@ -115,59 +161,87 @@ export default function KnowledgeGraphPage() {
           nodeDegrees.set(target, (nodeDegrees.get(target) || 0) + 1);
         });
 
-        // Create nodes with force-directed positioning
+        // Create nodes with web-like positioning using force simulation
         const transformedNodes = topics.map((topic: string) => {
           const degree = nodeDegrees.get(topic) || 0;
           const maxDegree = Math.max(...Array.from(nodeDegrees.values()));
           
-          // Nodes with higher degree get positioned closer to center
+          // Web-like positioning: create multiple layers radiating outward
           const centralityFactor = maxDegree > 0 ? degree / maxDegree : 0;
-          const baseRadius = 150 + (1 - centralityFactor) * 200; // High degree = smaller radius
           
-          // Calculate node size based on degree (more connections = bigger circle)
-          const minSize = 40;
-          const maxSize = 100;
-          const nodeSize = maxDegree > 0 
-            ? minSize + (degree / maxDegree) * (maxSize - minSize)
-            : minSize;
+          // Create web layers - more connected nodes closer to center
+          let layer = 0;
+          if (centralityFactor > 0.7) layer = 0; // Core nodes
+          else if (centralityFactor > 0.4) layer = 1; // Secondary nodes
+          else if (centralityFactor > 0.1) layer = 2; // Tertiary nodes
+          else layer = 3; // Peripheral nodes
           
-          // Add randomization
+          const layerRadii = [80, 140, 200, 280]; // Different radii for each layer
+          const baseRadius = layerRadii[layer];
+          
+          // Add organic variation within each layer
           const angle = Math.random() * 2 * Math.PI;
-          const radiusVariation = (Math.random() - 0.5) * 100;
-          const finalRadius = Math.max(50, baseRadius + radiusVariation);
+          const radiusVariation = (Math.random() - 0.5) * 40; // Smaller variation for more web-like structure
+          const finalRadius = Math.max(30, baseRadius + radiusVariation);
           
-          const x = 400 + finalRadius * Math.cos(angle);
-          const y = 300 + finalRadius * Math.sin(angle);
+          // Add some clustering based on connections
+          const connectedNodes = edgeList.filter(([source, target]: [string, string]) => 
+            source === topic || target === topic
+          ).map(([source, target]: [string, string]) => source === topic ? target : source);
           
+          // Slight clustering effect - nodes with common connections tend to be closer
+          let clusterOffsetX = 0;
+          let clusterOffsetY = 0;
+          if (connectedNodes.length > 0) {
+            clusterOffsetX = (Math.random() - 0.5) * 60;
+            clusterOffsetY = (Math.random() - 0.5) * 60;
+          }
+          
+          const x = 400 + finalRadius * Math.cos(angle) + clusterOffsetX;
+          const y = 300 + finalRadius * Math.sin(angle) + clusterOffsetY;
+          
+          const colorScheme = getNodeColor(topic);
           return {
             id: topic,
             type: 'customNode',
             position: { x, y },
             data: {
               label: topic,
-              color: getNodeColor(topic),
-              textColor: '#374151',
+              gradient: colorScheme.gradient,
+              textColor: colorScheme.textColor,
               category: `Topic (${degree} connections)`,
-              originalColor: getNodeColor(topic),
-              size: nodeSize
+              originalGradient: colorScheme.gradient,
+              originalTextColor: colorScheme.textColor
             }
           };
         });
         
-        // Create edges from edge list
-        const transformedEdges = edgeList.map((edge: [string, string], index: number) => ({
-          id: `edge-${index}`,
-          source: edge[0],
-          target: edge[1],
-          type: 'straight',
-          animated: false,
-          style: {
-            stroke: '#9CA3AF',
-            strokeWidth: 2,
-            opacity: 1
-          },
-          labelStyle: { fill: '#6B7280', fontWeight: 500 }
-        }));
+        // Create edges from edge list with web-like styling
+        const transformedEdges = edgeList.map((edge: [string, string], index: number) => {
+          const sourceDegree = nodeDegrees.get(edge[0]) || 0;
+          const targetDegree = nodeDegrees.get(edge[1]) || 0;
+          const edgeStrength = Math.min(sourceDegree, targetDegree);
+          
+          // Use consistent edge styling for better visibility
+          const strokeWidth = Math.max(1.5, Math.min(3, 1.5 + edgeStrength * 0.2));
+          
+          // Use straight lines for clean appearance
+          const edgeType = 'straight';
+          
+          return {
+            id: `edge-${index}`,
+            source: edge[0],
+            target: edge[1],
+            type: edgeType,
+            animated: false,
+            style: {
+              stroke: '#9ca3af',
+              strokeWidth: strokeWidth,
+              opacity: 0.8
+            },
+            labelStyle: { fill: '#6B7280', fontWeight: 500 }
+          };
+        });
         
         setNodes(transformedNodes);
         setEdges(transformedEdges);
@@ -183,9 +257,11 @@ export default function KnowledgeGraphPage() {
             position: { x: 400, y: 200 },
             data: { 
               label: 'Artificial Intelligence', 
-              color: '#E0E7FF', 
-              textColor: '#3730A3',
-              category: 'Core Concept'
+              gradient: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+              textColor: '#3730a3',
+              category: 'Core Concept',
+              originalGradient: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+              originalTextColor: '#3730a3'
             }
           },
           {
@@ -194,9 +270,11 @@ export default function KnowledgeGraphPage() {
             position: { x: 200, y: 300 },
             data: { 
               label: 'Machine Learning', 
-              color: '#D1FAE5', 
-              textColor: '#065F46',
-              category: 'Technology'
+              gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              textColor: '#14532d',
+              category: 'Technology',
+              originalGradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              originalTextColor: '#14532d'
             }
           }
         ];
@@ -207,8 +285,8 @@ export default function KnowledgeGraphPage() {
             source: 'ai', 
             target: 'ml', 
             label: 'includes',
-            type: 'smoothstep',
-            style: { stroke: '#9CA3AF', strokeWidth: 2 }
+            type: 'straight',
+            style: { stroke: '#9ca3af', strokeWidth: 1.5, opacity: 0.8 }
           }
         ];
         
@@ -241,14 +319,14 @@ export default function KnowledgeGraphPage() {
       }
     });
     
-    // Update nodes with highlighting (keep original colors, only change opacity)
+    // Update nodes with highlighting (keep original gradients, only change opacity)
     setNodes(currentNodes => 
       currentNodes.map(n => ({
         ...n,
         data: {
           ...n.data,
-          color: n.data.originalColor, // Keep original colors
-          textColor: '#374151' // Keep original text color
+          gradient: n.data.originalGradient, // Keep original gradients
+          textColor: n.data.originalTextColor // Keep original text color
         },
         style: {
           opacity: n.id === node.id || connectedNodeIds.has(n.id) ? 1 : 0.3
@@ -262,9 +340,9 @@ export default function KnowledgeGraphPage() {
         ...e,
         style: {
           ...e.style,
-          stroke: connectedEdgeIds.has(e.id) ? '#3B82F6' : '#9CA3AF',
-          strokeWidth: connectedEdgeIds.has(e.id) ? 3 : 2,
-          opacity: connectedEdgeIds.has(e.id) ? 1 : 0.2
+          stroke: connectedEdgeIds.has(e.id) ? '#6366f1' : '#9ca3af',
+          strokeWidth: connectedEdgeIds.has(e.id) ? 2.5 : 1.5,
+          opacity: connectedEdgeIds.has(e.id) ? 1 : 0.4
         }
       }))
     );
@@ -274,14 +352,14 @@ export default function KnowledgeGraphPage() {
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     
-    // Reset all nodes to original colors
+    // Reset all nodes to original gradients
     setNodes(currentNodes => 
       currentNodes.map(n => ({
         ...n,
         data: {
           ...n.data,
-          color: n.data.originalColor,
-          textColor: '#374151'
+          gradient: n.data.originalGradient,
+          textColor: n.data.originalTextColor
         },
         style: {
           opacity: 1
@@ -295,9 +373,9 @@ export default function KnowledgeGraphPage() {
         ...e,
         style: {
           ...e.style,
-          stroke: '#9CA3AF',
-          strokeWidth: 2,
-          opacity: 1
+          stroke: '#9ca3af',
+          strokeWidth: 1.5,
+          opacity: 0.8
         }
       }))
     );
@@ -305,16 +383,18 @@ export default function KnowledgeGraphPage() {
 
   // Handle adding new nodes
   const onAddNode = useCallback(() => {
+    const colorScheme = getNodeColor('New Concept');
     const newNode: Node = {
       id: `node-${Date.now()}`,
       type: 'customNode',
       position: { x: Math.random() * 400 + 200, y: Math.random() * 400 + 200 },
       data: {
         label: 'New Concept',
-        color: '#F3E8FF',
-        textColor: '#6B21A8',
+        gradient: colorScheme.gradient,
+        textColor: colorScheme.textColor,
         category: 'Custom',
-        originalColor: '#F3E8FF'
+        originalGradient: colorScheme.gradient,
+        originalTextColor: colorScheme.textColor
       }
     };
     setNodes((nds) => [...nds, newNode]);
@@ -322,28 +402,30 @@ export default function KnowledgeGraphPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      {/* Modern Header */}
+      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-3 hover:bg-gray-100/80 rounded-xl transition-all duration-200 hover:scale-105 group"
             >
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-600 group-hover:text-gray-900 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 className="text-2xl font-semibold text-gray-900">Knowledge Graph</h1>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                Knowledge Graph
+              </h1>
+              <p className="text-sm text-gray-500 font-medium">Interactive concept visualization</p>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Export
-            </button>
             <button 
               onClick={onAddNode}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
             >
               Add Node
             </button>
@@ -351,86 +433,49 @@ export default function KnowledgeGraphPage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Sidebar */}
-        <div className="w-80 bg-white border-r border-gray-200 p-6">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Graph Statistics</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Total Nodes</span>
-                  <span className="text-sm font-medium text-gray-900">{nodes.length}</span>
+      {/* Main Content - Full Width */}
+      <div className="h-[calc(100vh-80px)]">
+        {/* React Flow Area */}
+        <div className="h-full relative">
+          {/* Web-like background pattern */}
+          <div 
+            className="absolute inset-0 pointer-events-none opacity-20"
+            style={{
+              backgroundImage: `
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.1) 0%, transparent 50%)
+              `,
+              backgroundSize: '200px 200px, 300px 300px, 250px 250px',
+              backgroundPosition: '0 0, 100px 100px, 50px 150px'
+            }}
+          />
+          
+          {/* Floating Statistics Overlay */}
+          <div className="absolute top-4 left-4 z-10 pointer-events-none">
+            <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-4 border border-gray-200/50 shadow-lg">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                Graph Stats
+              </h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Nodes:</span>
+                  <span className="text-lg font-semibold text-gray-800">{nodes.length}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Total Connections</span>
-                  <span className="text-sm font-medium text-gray-900">{edges.length}</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Connections:</span>
+                  <span className="text-lg font-semibold text-gray-800">{edges.length}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Graph Density</span>
-                  <span className="text-sm font-medium text-gray-900">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Density:</span>
+                  <span className="text-lg font-semibold text-gray-800">
                     {nodes.length > 1 ? ((edges.length / (nodes.length * (nodes.length - 1))) * 100).toFixed(1) : '0.0'}%
                   </span>
                 </div>
               </div>
             </div>
-
-            {selectedNode && (
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Selected Node</h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                  <div>
-                    <span className="text-sm font-medium text-gray-700">Label:</span>
-                    <p className="text-sm text-gray-900 mt-1">{selectedNode.data?.label}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-700">Category:</span>
-                    <p className="text-sm text-gray-900 mt-1">{selectedNode.data?.category}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-700">Connections:</span>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {edges.filter(e => e.source === selectedNode.id || e.target === selectedNode.id).length}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Color:</span>
-                    <div 
-                      className="w-4 h-4 rounded-full border border-gray-300"
-                      style={{ backgroundColor: selectedNode.data?.color }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Legend</h3>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span className="text-gray-600">Core Concepts</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-600">Technologies</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <span className="text-gray-600">Methods</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
-                  <span className="text-gray-600">Applications</span>
-                </div>
-              </div>
-            </div>
           </div>
-        </div>
-
-        {/* React Flow Area */}
-        <div className="flex-1 relative">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -442,29 +487,47 @@ export default function KnowledgeGraphPage() {
             nodeTypes={nodeTypes}
             connectionMode={ConnectionMode.Loose}
             fitView
-            className="bg-gray-50"
+            className="bg-gradient-to-br from-gray-50 to-gray-100"
           >
-            <Controls className="bg-white border border-gray-200 rounded-lg shadow-sm" />
+            <Controls className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-lg" />
             <MiniMap 
-              className="bg-white border border-gray-200 rounded-lg shadow-sm"
-              nodeColor={(node) => node.data?.color || '#6366f1'}
+              className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-lg"
+              nodeColor={(node) => node.data?.gradient || node.data?.color || '#6366f1'}
             />
             <Background 
               variant={BackgroundVariant.Dots} 
-              gap={20} 
+              gap={30} 
               size={1}
-              color="#e5e7eb"
+              color="#f3f4f6"
             />
             
             {/* Instructions Panel */}
-            <Panel position="top-right" className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm max-w-xs">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">Instructions</h4>
-              <ul className="text-xs text-gray-600 space-y-1">
-                <li>• Drag nodes to reposition them</li>
-                <li>• Click nodes to select and view details</li>
-                <li>• Drag from node handles to create connections</li>
-                <li>• Use controls to zoom and fit view</li>
-                <li>• Add new nodes with the button above</li>
+            <Panel position="top-right" className="bg-white/90 backdrop-blur-xl border border-gray-200/50 rounded-2xl p-6 shadow-lg max-w-sm">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                Instructions
+              </h4>
+              <ul className="text-sm text-gray-600 space-y-3 font-medium">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                  Drag nodes to reposition them
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                  Click nodes to select and view details
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                  Drag from handles to create connections
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                  Use controls to zoom and fit view
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                  Add new nodes with the button above
+                </li>
               </ul>
             </Panel>
           </ReactFlow>
