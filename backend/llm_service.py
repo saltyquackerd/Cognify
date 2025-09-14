@@ -17,55 +17,60 @@ class LLM():
         )
         self.max_tokens=1000
     
-    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, system_prompt: str = None, isStreaming : bool = True):
+    def stream_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, system_prompt: str = None):
         """
-        Get response from Cerebras API for a given message with conversation context
-        
-        Args:
-            message (str): User's message/query
-            conversation_history (List[Dict], optional): Previous conversation messages
-            model (str, optional): Model to use (see Cerebras API). Defaults to default_model
-            system_prompt (str, optional): System prompt for the conversation
-            isStreaming (bool): Whether to stream the response
-            
-        Returns:
-            str: AI response or error message
+        Stream response chunks from Cerebras API.
+        Yields text chunks as they arrive.
         """
-        
         if not self.cerebras_client.api_key:
             yield "Error: CEREBRAS_API_KEY not configured"
+            return
         
         model = model or self.default_cerebras_model
-        
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         if conversation_history:
             messages.extend(conversation_history)
-        
         messages.append({"role": "user", "content": message})
         print(messages)
-        
         try:
-            if isStreaming:
-                stream = self.cerebras_client.chat.completions.create(
-                    messages=messages,
-                    model=model,
-                    stream=True
-                )
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-            else:
-                response = self.cerebras_client.chat.completions.create(
-                    messages=messages,
-                    model=model,
-                    stream=False
-                )
-                return response.choices[0].message.content
-            
+            stream = self.cerebras_client.chat.completions.create(
+                messages=messages,
+                model=model,
+                stream=True
+            )
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
         except requests.exceptions.RequestException as e:
             yield f"Error communicating with Cerebras API: {str(e)}"
+
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, system_prompt: str = None) -> str:
+        """
+        Get a full, non-streaming response from Cerebras API.
+        Returns the complete text.
+        """
+        if not self.cerebras_client.api_key:
+            return "Error: CEREBRAS_API_KEY not configured"
+        
+        model = model or self.default_cerebras_model
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        if conversation_history:
+            messages.extend(conversation_history)
+        messages.append({"role": "user", "content": message})
+        print(messages)
+        try:
+            response = self.cerebras_client.chat.completions.create(
+                messages=messages,
+                model=model,
+                stream=False
+            )
+            return response.choices[0].message.content
+        except requests.exceptions.RequestException as e:
+            return f"Error communicating with Cerebras API: {str(e)}"
     
     def generate_quiz_questions(self, response_text: str, user_highlight: str = None, conversation_history: List[Dict] = None):
         """
@@ -101,7 +106,7 @@ class LLM():
 
         conversation.append({"role": "user", "content": user_prompt})
 
-        return self.get_chat_response(user_prompt, conversation_history = conversation, system_prompt = system_prompt, isStreaming=False)
+        return self.get_chat_response(user_prompt, conversation_history = conversation, system_prompt = system_prompt)
     
     def evaluate_answer(self, conversation_history : List[Dict]):
         """
@@ -122,7 +127,7 @@ class LLM():
         if conversation_history is None:
             return f"Error: Conversation history (assistant question and user answer) expected"
         
-        return self.get_chat_response(prompt, conversation_history = conversation_history, system_prompt = prompt, isStreaming=False)
+        return self.get_chat_response(prompt, conversation_history = conversation_history, system_prompt = prompt)
 
     def get_title(self, response : str):
         """
@@ -145,7 +150,7 @@ class LLM():
                 </CONVERSATION_HISTORY>
                 """
 
-        return self.get_chat_response(prompt, conversation_history = [{'role' : 'assistant', 'content' : response}], isStreaming=False)
+        return self.get_chat_response(prompt, conversation_history = [{'role' : 'assistant', 'content' : response}])
 
 
 def main():

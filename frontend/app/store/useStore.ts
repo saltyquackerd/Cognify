@@ -295,7 +295,8 @@ export const useStore = create<StoreState>((set, get) => ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          start_assistant_message_id: message.id
+          start_assistant_message_id: message.id,
+          start_assistant_message_text: message.content
         }),
       });
       
