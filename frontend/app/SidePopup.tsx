@@ -46,16 +46,13 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
 
   // Reset state when messageId changes (popup opens for different message)
   useEffect(() => {
-    console.log('SidePopup messageId changed, resetting state');
+    console.log('SidePopup messageId changed, resetting state for messageId:', messageId);
     setMessages([]);
     setAskedInitial(false);
     setHasQuiz(false);
     setIsAskingQuestion(false);
-    // Reset response count when opening new quiz
-    if (onResponseCountChange) {
-      onResponseCountChange(0);
-    }
-  }, [messageId, onResponseCountChange]);
+    // Don't immediately reset response count - let it be calculated from loaded messages
+  }, [messageId]);
 
   // Ensure quiz exists and ask initial question
   useEffect(() => {
@@ -207,6 +204,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
   // Track response count and notify parent
   useEffect(() => {
     const userResponseCount = messages.filter(msg => msg.role === 'user').length;
+    console.log('SidePopup - tracking response count:', userResponseCount, 'from messages:', messages);
     if (onResponseCountChange) {
       onResponseCountChange(userResponseCount);
     }
