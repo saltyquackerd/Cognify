@@ -225,7 +225,7 @@ def chat():
                 yield f"data: {json.dumps({'status': 'started', 'session_id': session_id, 'user_message_id': user_message_doc['message_id']})}\n\n"
                 
                 # Get streaming response from LLM
-                chat_response_stream = llm_service.get_chat_response(message=user_message, conversation_history=session['conversation_history'])
+                chat_response_stream = llm_service.stream_chat_response(message=user_message, conversation_history=session['conversation_history'])
                 
                 # Collect the full response for storage
                 full_response = ""
@@ -317,6 +317,7 @@ def create_quiz_thread(session_id):
     try:
         data = request.get_json()
         start_assistant_message_id = data.get('start_assistant_message_id', '')
+        start_assistant_message_text = data.get('start_assistant_message_text', '')
         
         if session_id not in sessions:
             return jsonify({'error': 'Session not found'}), 404
@@ -330,7 +331,10 @@ def create_quiz_thread(session_id):
         
         # Find the assistant message and get the user message above it
         for i in range(len(messages) - 1, -1, -1):
-            if messages[i]['message_id'] == start_assistant_message_id and messages[i]['role'] == 'assistant':
+            if (
+                (start_assistant_message_id and messages[i]['message_id'] == start_assistant_message_id) or
+                (start_assistant_message_text and messages[i]['role'] == 'assistant' and messages[i]['message'] == start_assistant_message_text)
+            ) and messages[i]['role'] == 'assistant':
                 # Find the corresponding user message (search backwards from this assistant message)
                 for j in range(i - 1, -1, -1):
                     if messages[j]['role'] == 'user':
@@ -339,22 +343,38 @@ def create_quiz_thread(session_id):
                 break
         
         if not start_user_message_id:
-            return jsonify({'error': 'Corresponding user message not found'}), 404
+            # Fallback: try to infer the preceding user message from conversation history
+            conv_hist = sessions[session_id].get('conversation_history', [])
+            inferred_user_msg = None
+            for msg in reversed(conv_hist):
+                if msg.get('role') == 'user':
+                    inferred_user_msg = msg.get('content', '')
+                    break
+            if inferred_user_msg:
+                # Create a synthetic user message document
+                synthetic_user_doc = MessageSchema.create_message_document(inferred_user_msg, 'user')
+                start_user_message = synthetic_user_doc
+            else:
+                start_user_message = None
         
         # Get the actual message content
         start_user_message = None
         start_assistant_message = None
         
         for msg in messages:
-            if msg['message_id'] == start_user_message_id:
+            if start_user_message_id and msg['message_id'] == start_user_message_id:
                 start_user_message = msg
-            elif msg['message_id'] == start_assistant_message_id:
+            if msg['message_id'] == start_assistant_message_id:
                 start_assistant_message = msg
         
-        if not start_user_message or not start_assistant_message:
-            return jsonify({'error': 'Start messages not found'}), 404
+        if not start_assistant_message:
+            return jsonify({'error': 'Start assistant message not found'}), 404
 
-        prev_context = combine_session_and_quiz_history(messages, start_user_message, sessions[session_id]['conversation_history'])
+        # Build previous context; if user message is missing, use full conversation history as-is
+        if start_user_message:
+            prev_context = combine_session_and_quiz_history(messages, start_user_message, sessions[session_id]['conversation_history'])
+        else:
+            prev_context = sessions[session_id]['conversation_history'][:]
         
         # Create new quiz thread
         quiz_id = str(uuid.uuid4())
@@ -365,13 +385,16 @@ def create_quiz_thread(session_id):
             'start_assistant_message': start_assistant_message,
             'prev_context': prev_context,
             'created_at': datetime.now().isoformat(),
-            'messages': [
-                {
-                    'message_id': start_user_message['message_id'],
-                    'message': start_user_message['message'],
-                    'timestamp': start_user_message['timestamp'],
-                    'role': 'user'
-                },
+            'messages': (
+                [
+                    {
+                        'message_id': start_user_message['message_id'],
+                        'message': start_user_message['message'],
+                        'timestamp': start_user_message['timestamp'],
+                        'role': 'user'
+                    }
+                ] if start_user_message else []
+            ) + [
                 {
                     'message_id': start_assistant_message['message_id'],
                     'message': start_assistant_message['message'],
@@ -379,8 +402,9 @@ def create_quiz_thread(session_id):
                     'role': 'assistant'
                 }
             ],
-            'conversation_history': [
-                {"role": "user", "content": start_user_message['message']},
+            'conversation_history': (
+                [{"role": "user", "content": start_user_message['message']}] if start_user_message else []
+            ) + [
                 {"role": "assistant", "content": start_assistant_message['message']}
             ]
         }
@@ -418,10 +442,14 @@ def submit_quiz_answer(quiz_id):
         quiz['messages'].append(answer_message_doc)
         quiz['conversation_history'].append({"role": "user", "content": user_answer})
         
-        # Get AI judgment using the conversation history
-        evaluation = llm_service.evaluate_answer(
+        # Get AI judgment using the conversation history (consume generator to string)
+        evaluation_stream = llm_service.evaluate_answer(
             conversation_history=quiz['conversation_history']
         )
+        evaluation = ""
+        for chunk in evaluation_stream:
+            if chunk:
+                evaluation += chunk
         
         # Add AI judgment to both messages array and conversation history
         evaluation_message_doc = MessageSchema.create_message_document(evaluation, 'assistant')
@@ -454,12 +482,16 @@ def ask_quiz_question(quiz_id):
         if not target_assistant_message:
             return jsonify({'error': 'Target assistant message not found in quiz'}), 404
         
-        # Generate quiz questions from the target assistant message
+        # Generate quiz questions from the target assistant message (consume generator to string)
         combined_history = quiz['prev_context'] + quiz['conversation_history']
-        quiz_questions_text = llm_service.generate_quiz_questions(
+        quiz_questions_stream = llm_service.generate_quiz_questions(
             target_assistant_message['message'], 
             conversation_history=combined_history
         )
+        quiz_questions_text = ""
+        for chunk in quiz_questions_stream:
+            if chunk:
+                quiz_questions_text += chunk
         
         # Add quiz questions to both messages array and conversation history
         quiz_message_doc = MessageSchema.create_message_document(quiz_questions_text, 'assistant')
