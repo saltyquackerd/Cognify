@@ -43,7 +43,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
           // Ask the first question automatically
           (async () => {
             try {
-              await askQuestion(quizConversationId, messageId);
+              await askQuestion(quizConversationId);
               setAskedInitial(true);
             } catch (e) {
               console.error(e);
@@ -58,13 +58,13 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     }
   }, [messageId, getQuizForMessage, askedInitial]);
 
-  const askQuestion = async (quizId: string, targetAssistantMessageId: string) => {
+  const askQuestion = async (quizId: string) => {
     const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/ask-question`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assistant_message_id: targetAssistantMessageId })
+      method: 'POST'
     });
     if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.error('Failed to ask quiz question', response.status, errText);
       throw new Error('Failed to ask quiz question');
     }
     const data = await response.json();
@@ -94,7 +94,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       setHasQuiz(true);
       setMessages([]);
       setAskedInitial(true);
-      await askQuestion(quizConv.id, messageId);
+      await askQuestion(quizConv.id);
     } catch (error) {
       console.error('Failed to create quiz thread:', error);
     } finally {
@@ -411,7 +411,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
               if (!messageId) return;
               const quizId = getQuizForMessage(messageId);
               if (quizId) {
-                askQuestion(quizId, messageId);
+                askQuestion(quizId);
               }
             }}
             className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"

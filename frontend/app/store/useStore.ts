@@ -53,9 +53,7 @@ interface StoreState {
   findEmptyConversation: () => Conversation | null;
   createOrSelectEmptyConversation: (userId: string) => Promise<Conversation>;
   
-  // Thread/Quiz functions
-  createQuizThread: (messageId: string, sessionId: string) => Promise<any>;
-  getQuizThread: (quizId: string) => Promise<any>;
+  // Quiz functions
   
   // Computed values
   selectedConversation: Conversation | null;
@@ -312,29 +310,7 @@ export const useStore = create<StoreState>((set, get) => ({
         isActive: false
       };
       
-      // Seed the quiz with the original assistant message
-      const seededAssistantMessage: Message = {
-        id: `${message.id}-seed`,
-        content: message.content,
-        role: 'assistant',
-        timestamp: new Date(),
-        conversationId: threadConversation.id,
-      };
-      
-<<<<<<< Updated upstream
-      // Add quiz questions as assistant messages
-      const quizMessages: Message[] = quizData.quiz_questions.map((q: { question: string }, index: number) => ({
-        id: `${quizData.quiz_id}-quiz-${index}`,
-        content: `Q${index + 1}: ${q.question}`,
-        role: 'assistant' as const,
-        timestamp: new Date(),
-        conversationId: threadConversation.id,
-      }));
-      
-      // Store thread messages separately (not in main conversations)
-=======
-      // Store quiz mapping only (messages are managed locally in the popup)
->>>>>>> Stashed changes
+      // Store quiz mapping only (messages managed by popup)
       set((state) => ({
         messageQuizMap: {
           ...state.messageQuizMap,
@@ -455,53 +431,5 @@ export const useStore = create<StoreState>((set, get) => ({
 
   getConversationById: (id) => {
     return get().conversations.find(conv => conv.id === id) || null;
-  },
-
-  // Thread/Quiz functions
-  createQuizThread: async (messageId, sessionId) => {
-    try {
-      const response = await fetch('http://localhost:5000/api/create-quiz-thread', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message_id: messageId,
-          session_id: sessionId
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create quiz thread');
-      }
-
-      const data = await response.json();
-      console.log('Quiz thread created:', data);
-      return data;
-    } catch (error) {
-      console.error('Error creating quiz thread:', error);
-      throw error;
-    }
-  },
-
-  getQuizThread: async (quizId) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/quiz/${quizId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get quiz thread');
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error getting quiz thread:', error);
-      throw error;
-    }
   }
 }));
