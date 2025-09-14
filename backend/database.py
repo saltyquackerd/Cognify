@@ -267,6 +267,27 @@ class DatabaseService:
             print(f"Error updating quiz: {e}")
             return False
     
+    def add_message_to_quiz(self, quiz_id: str, message: str, role: str) -> str:
+        """Add a message to a quiz"""
+        if not self.is_connected():
+            return None
+        
+        try:
+            message_doc = MessageSchema.create_message_document(message, role)
+            
+            # Add message to quiz's messages array
+            result = self.quizzes_collection.update_one(
+                {'_id': quiz_id},
+                {'$push': {'messages': message_doc}}
+            )
+            
+            if result.modified_count > 0:
+                return message_doc['message_id']
+            return None
+        except Exception as e:
+            print(f"Error adding message to quiz: {e}")
+            return None
+    
     def add_quiz_conversation_history(self, quiz_id: str, role: str, content: str) -> bool:
         """Add entry to quiz's conversation history"""
         if not self.is_connected():

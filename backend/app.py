@@ -311,99 +311,84 @@ def combine_session_and_quiz_history(session_messages, target_user_message, targ
     
     return combined_history
 
-@app.route('/api/create-quiz-thread', methods=['POST'])
-def create_quiz_thread():
-    """Create a quiz thread from a specific chat response"""
+@app.route('/api/sessions/<session_id>/quiz/start', methods=['POST'])
+def create_quiz_thread(session_id):
+    """Create a new quiz thread for a session"""
     try:
         data = request.get_json()
-        message_id = data.get('message_id', '')
-        session_id = data.get('session_id', '')
-        
-        if not message_id or not session_id:
-            return jsonify({'error': 'Message ID and Session ID are required'}), 400
+        start_assistant_message_id = data.get('start_assistant_message_id', '')
         
         if session_id not in sessions:
             return jsonify({'error': 'Session not found'}), 404
         
-        # Find the specific assistant message (search from bottom for recent messages)
-        target_assistant_message = None
-        target_user_message = None
+        if not start_assistant_message_id:
+            return jsonify({'error': 'start_assistant_message_id is required'}), 400
+        
+        # Find the start_user_message_id (the message above the assistant message)
+        start_user_message_id = None
         messages = sessions[session_id]['messages']
         
-        # Find the assistant message by ID
+        # Find the assistant message and get the user message above it
         for i in range(len(messages) - 1, -1, -1):
-            if messages[i]['message_id'] == message_id and messages[i]['role'] == 'assistant':
-                target_assistant_message = messages[i]
+            if messages[i]['message_id'] == start_assistant_message_id and messages[i]['role'] == 'assistant':
                 # Find the corresponding user message (search backwards from this assistant message)
                 for j in range(i - 1, -1, -1):
                     if messages[j]['role'] == 'user':
-                        target_user_message = messages[j]
+                        start_user_message_id = messages[j]['message_id']
                         break
                 break
         
-        if not target_assistant_message:
-            return jsonify({'error': 'Assistant message not found'}), 404
-        
-        if not target_user_message:
+        if not start_user_message_id:
             return jsonify({'error': 'Corresponding user message not found'}), 404
         
-        # Generate quiz questions from the specific response
-        combined_history = combine_session_and_quiz_history(
-            sessions[session_id]['messages'],
-            target_user_message,
-            target_assistant_message
-        )
-        quiz_questions_text = llm_service.generate_quiz_questions(target_assistant_message['message'], conversation_history=combined_history)
+        # Get the actual message content
+        start_user_message = None
+        start_assistant_message = None
         
-        # Create a single question structure from the generated text
-        quiz_questions = [{
-            'id': str(uuid.uuid4()),
-            'type': 'long_answer',
-            'question': quiz_questions_text,
-            'source_text': target_assistant_message['message']
-        }]
+        for msg in messages:
+            if msg['message_id'] == start_user_message_id:
+                start_user_message = msg
+            elif msg['message_id'] == start_assistant_message_id:
+                start_assistant_message = msg
         
-        # Create quiz thread
+        if not start_user_message or not start_assistant_message:
+            return jsonify({'error': 'Start messages not found'}), 404
+        
+        # Create new quiz thread
         quiz_id = str(uuid.uuid4())
         quizzes[quiz_id] = {
             'id': quiz_id,
             'session_id': session_id,
             'user_id': sessions[session_id]['user_id'],
-            'message_id': message_id,
-            'questions': quiz_questions,
-            'current_question_index': 0,
-            'completed': False,
             'created_at': datetime.now().isoformat(),
+            'messages': [
+                {
+                    'message_id': start_user_message['message_id'],
+                    'message': start_user_message['message'],
+                    'timestamp': start_user_message['timestamp'],
+                    'role': 'user'
+                },
+                {
+                    'message_id': start_assistant_message['message_id'],
+                    'message': start_assistant_message['message'],
+                    'timestamp': start_assistant_message['timestamp'],
+                    'role': 'assistant'
+                }
+            ],
             'conversation_history': [
-                {"role": "user", "content": target_user_message['message']},
-                {"role": "assistant", "content": target_assistant_message['message']},
-                {"role": "assistant", "content": f"Quiz Questions:\n" + "\n".join([f"Q{i+1}: {q['question']}" for i, q in enumerate(quiz_questions)])}
-            ]  # Track complete quiz thread conversation in LLM-ready format
+                {"role": "user", "content": start_user_message['message']},
+                {"role": "assistant", "content": start_assistant_message['message']}
+            ]
         }
         
+        # Add quiz to session
         sessions[session_id]['quizzes'].append(quiz_id)
         
         return jsonify({
             'quiz_id': quiz_id,
-            'message_id': message_id,
-            'quiz_questions': quiz_questions,
-            'source_response': target_assistant_message['message']
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/quiz/<quiz_id>', methods=['GET'])
-def get_quiz(quiz_id):
-    """Get quiz questions"""
-    try:
-        if quiz_id not in quizzes:
-            return jsonify({'error': 'Quiz not found'}), 404
-        
-        quiz = quizzes[quiz_id]
-        return jsonify({
-            'quiz_id': quiz_id,
-            'questions': quiz['questions']
+            'session_id': session_id,
+            'user_id': sessions[session_id]['user_id'],
+            'created_at': quizzes[quiz_id]['created_at']
         })
         
     except Exception as e:
@@ -423,71 +408,76 @@ def submit_quiz_answer(quiz_id):
             return jsonify({'error': 'Answer is required'}), 400
         
         quiz = quizzes[quiz_id]
-        current_index = quiz['current_question_index']
         
-        # Check if there are questions to answer
-        if current_index >= len(quiz['questions']):
-            return jsonify({'error': 'No more questions to answer'}), 400
+        # Add user answer to both messages array and conversation history
+        answer_message_doc = MessageSchema.create_message_document(user_answer, 'user')
+        quiz['messages'].append(answer_message_doc)
+        quiz['conversation_history'].append({"role": "user", "content": user_answer})
         
-        question = quiz['questions'][current_index]
-        
-        # Get AI judgment
-        judgment = llm_service.evaluate_answer(
-            str(quiz['conversation_history']),
-            question['question'], 
-            user_answer
+        # Get AI judgment using the conversation history
+        evaluation = llm_service.evaluate_answer(
+            conversation_history=quiz['conversation_history']
         )
         
-        # Store the answer and judgment in quiz conversation history
-        quiz['conversation_history'].extend([
-            {"role": "user", "content": user_answer},
-            {"role": "assistant", "content": judgment}
-        ])
-        
-        # Move to next question or mark as completed
-        quiz['current_question_index'] += 1
-        if quiz['current_question_index'] >= len(quiz['questions']):
-            quiz['completed'] = True
+        # Add AI judgment to both messages array and conversation history
+        evaluation_message_doc = MessageSchema.create_message_document(evaluation, 'assistant')
+        quiz['messages'].append(evaluation_message_doc)
+        quiz['conversation_history'].append({"role": "assistant", "content": evaluation})
         
         return jsonify({
             'quiz_id': quiz_id,
-            'judgment': judgment,
-            'conversation_history': quiz['conversation_history'],
-            'completed': quiz['completed'],
-            'has_more_questions': quiz['current_question_index'] < len(quiz['questions'])
+            'answer_message_id': answer_message_doc['message_id'],
+            'evaluation_message_id': evaluation_message_doc['message_id'],
+            'evaluation': evaluation,
+            'timestamp': answer_message_doc['timestamp']
         })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/quiz/<quiz_id>/continue', methods=['POST'])
-def continue_quiz_conversation(quiz_id):
-    """Continue the quiz conversation with follow-up questions"""
+@app.route('/api/quiz/<quiz_id>/ask-question', methods=['POST'])
+def ask_quiz_question(quiz_id):
+    """Ask a question for a target assistant message"""
     try:
         data = request.get_json()
-        user_message = data.get('message', '')
+        assistant_message_id = data.get('assistant_message_id', '')
         
         if quiz_id not in quizzes:
             return jsonify({'error': 'Quiz not found'}), 404
         
-        if not user_message:
-            return jsonify({'error': 'Message is required'}), 400
+        if not assistant_message_id:
+            return jsonify({'error': 'assistant_message_id is required'}), 400
         
         quiz = quizzes[quiz_id]
         
-        # Add current message to conversation history
-        quiz['conversation_history'].append({"role": "user", "content": user_message})
+        # Find the target assistant message in quiz messages
+        target_assistant_message = None
+        for i in range(len(quiz['messages']) - 1, -1, -1):
+            msg = quiz['messages'][i]
+            if msg['message_id'] == assistant_message_id and msg['role'] == 'assistant':
+                target_assistant_message = msg
+                break
         
-        # Get AI response using the conversation history directly
-        ai_response = llm_service.get_chat_response("", quiz['conversation_history'])
+        if not target_assistant_message:
+            return jsonify({'error': 'Target assistant message not found in quiz'}), 404
         
-        # Store the AI response
-        quiz['conversation_history'].append({"role": "assistant", "content": ai_response})
+        # Generate quiz questions from the target assistant message
+        # combined_history = combine_session_and_quiz_history(quiz['messages'], start_quiz_message, quiz['conversation_history'])
+        quiz_questions_text = llm_service.generate_quiz_questions(
+            target_assistant_message['message'], 
+            conversation_history=quiz['conversation_history']
+        )
+        
+        # Add quiz questions to both messages array and conversation history
+        quiz_message_doc = MessageSchema.create_message_document(quiz_questions_text, 'assistant')
+        quiz['messages'].append(quiz_message_doc)
+        quiz['conversation_history'].append({"role": "assistant", "content": quiz_questions_text})
         
         return jsonify({
             'quiz_id': quiz_id,
-            'ai_response': ai_response,
-            'conversation_history': quiz['conversation_history']
+            'quiz_message_id': quiz_message_doc['message_id'],
+            'quiz_questions': quiz_questions_text,
+            'timestamp': quiz_message_doc['timestamp']
         })
         
     except Exception as e:
