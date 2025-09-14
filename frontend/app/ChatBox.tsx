@@ -66,6 +66,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   }, [currentMessages, isLoading]);
   const [sidePopupOpen, setSidePopupOpen] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [currentSidePopupWidth, setCurrentSidePopupWidth] = useState(384);
   
   console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
@@ -139,15 +140,17 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     }
   };
 
-  const handleOpenSidePopup = (message: string) => {
+  const handleOpenSidePopup = (message: Message) => {
     console.log('Opening side popup with message:', message);
-    setPopupMessage(message);
+    setPopupMessage(message.content);
+    setSelectedMessageId(message.id);
     setSidePopupOpen(true);
   };
 
   const handleCloseSidePopup = () => {
     setSidePopupOpen(false);
     setPopupMessage('');
+    setSelectedMessageId(null);
   };
 
   return (
@@ -223,7 +226,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                       {/* Side Popup Trigger Button - Only for assistant messages */}
                       {message.role === 'assistant' && (
                         <button
-                          onClick={() => handleOpenSidePopup(message.content)}
+                          onClick={() => handleOpenSidePopup(message)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600 self-end mt-1"
                           title="Continue this conversation in side panel"
                         >
@@ -275,6 +278,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           initialMessage={popupMessage}
           title="Check Your Recall"
           onWidthChange={setCurrentSidePopupWidth}
+          messageId={selectedMessageId}
         />
       )}
     </div>
