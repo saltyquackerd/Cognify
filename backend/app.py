@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 from llm_service import LLM
+from auth import SimpleAuth
 
 # Load environment variables
 load_dotenv()
@@ -12,8 +13,9 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Initialize LLM service
+# Initialize services
 llm_service = LLM()
+auth_service = SimpleAuth()
 
 # In-memory storage for demo purposes (use a database in production)
 # Data structure: users -> sessions -> quizzes
@@ -77,6 +79,94 @@ def initialize_test_data():
 
 # Initialize test data
 initialize_test_data()
+
+# Authentication Routes
+@app.route('/api/auth/google', methods=['POST'])
+def google_oauth():
+    """Handle Google OAuth authentication"""
+    try:
+        data = request.get_json()
+        id_token = data.get('id_token')
+        
+        if not id_token:
+            return jsonify({'error': 'ID token is required'}), 400
+        
+        # Verify Google token
+        user_info = auth_service.verify_google_token(id_token)
+        if not user_info:
+            return jsonify({'error': 'Invalid Google token or OAuth not configured'}), 401
+        
+        # Check if user exists, create if not
+        user_id = user_info['id']
+        if user_id not in users:
+            users[user_id] = {
+                'id': user_id,
+                'username': user_info['name'],
+                'email': user_info['email'],
+                'picture': user_info.get('picture', ''),
+                'is_guest': False,
+                'created_at': datetime.now().isoformat(),
+                'sessions': []
+            }
+        
+        return jsonify({
+            'user': {
+                'id': user_id,
+                'username': user_info['name'],
+                'email': user_info['email'],
+                'picture': user_info.get('picture', ''),
+                'is_guest': False
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auth/guest', methods=['POST'])
+def guest_login():
+    """Handle guest login with just a username"""
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        
+        if not username:
+            return jsonify({'error': 'Username is required'}), 400
+        
+        # Create guest user
+        user_info = auth_service.create_guest_user(username)
+        user_id = user_info['id']
+        
+        # Store guest user
+        users[user_id] = {
+            'id': user_id,
+            'username': user_info['name'],
+            'email': '',
+            'picture': '',
+            'is_guest': True,
+            'created_at': datetime.now().isoformat(),
+            'sessions': []
+        }
+        
+        return jsonify({
+            'user': {
+                'id': user_id,
+                'username': user_info['name'],
+                'email': '',
+                'picture': '',
+                'is_guest': True
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auth/config', methods=['GET'])
+def auth_config():
+    """Get authentication configuration"""
+    return jsonify({
+        'google_oauth_enabled': bool(auth_service.google_client_id),
+        'guest_enabled': True
+    })
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
