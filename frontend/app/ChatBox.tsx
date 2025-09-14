@@ -114,7 +114,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           <div className={`px-4 py-4 ${sidePopupOpen ? 'max-w-2xl ml-16' : 'w-full px-16'}`} style={sidePopupOpen ? { maxWidth: `${Math.max(400, window.innerWidth - currentSidePopupWidth - 100)}px` } : {}}>
           <div className="flex items-center justify-between">
             <div>
-                <h1 className="text-xl font-semibold text-gray-900">
+                <h1 className="text-xl text-gray-900">
                   {selectedConversation ? selectedConversation.title : 'Cognify'}
                 </h1>
               {selectedConversation && (
@@ -143,11 +143,11 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
             {currentMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
                 <div className="max-w-md">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                  <h2 className="text-4xl text-gray-900 mb-4">
                     {selectedConversation ? `Welcome to ${selectedConversation.title}` : 'Welcome to Cognify'}
                   </h2>
                   <p className="text-gray-600 mb-8">
-                    {selectedConversation ? 'Start chatting in this conversation.' : 'Select a conversation from the sidebar to start chatting.'}
+                    {selectedConversation ? 'Start chatting in this conversation.' : 'Select a conversation from the sidebar to start learning.'}
                   </p>
                 </div>
               </div>
