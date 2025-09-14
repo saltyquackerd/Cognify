@@ -38,62 +38,9 @@ def initialize_test_data():
     # Test user
     users['1'] = {
         'id': '1',
-        'username': 'alice',
-        'created_at': '2024-01-15T10:30:00',
-        'sessions': ['session1', 'session2']
-    }
-    
-    # Test sessions
-    sessions['session1'] = {
-        'id': 'session1',
-        'user_id': '1',
-        'created_at': '2024-01-15T10:30:00',
-        'title': 'React component',
-        'messages': [
-            {
-                'message_id': 'msg1_user',
-                'message': 'How to create a button component?',
-                'role': 'user',
-                'timestamp': '2024-01-15T10:30:00'
-            },
-            {
-                'message_id': 'msg1_assistant',
-                'message': 'Here is how to create a button component...',
-                'role': 'assistant',
-                'timestamp': '2024-01-15T10:30:01'
-            }
-        ],
-        'quizzes': [],
-        'conversation_history': [
-            {"role": "user", "content": "How to create a button component?"},
-            {"role": "assistant", "content": "Here is how to create a button component..."}
-        ]
-    }
-    
-    sessions['session2'] = {
-        'id': 'session2',
-        'user_id': '1', 
-        'created_at': '2024-01-14T15:45:00',
-        'title': 'JavaScript patterns',
-        'messages': [
-            {
-                'message_id': 'msg2_user',
-                'message': 'What are async/await best practices?',
-                'role': 'user',
-                'timestamp': '2024-01-14T15:45:00'
-            },
-            {
-                'message_id': 'msg2_assistant',
-                'message': 'Async/await best practices include...',
-                'role': 'assistant',
-                'timestamp': '2024-01-14T15:45:01'
-            }
-        ],
-        'quizzes': [],
-        'conversation_history': [
-            {"role": "user", "content": "What are async/await best practices?"},
-            {"role": "assistant", "content": "Async/await best practices include..."}
-        ]
+        'username': 'Zailey',
+        'created_at': '2025-09-15T10:30:00',
+        'sessions': []
     }
 
 # Initialize test data
