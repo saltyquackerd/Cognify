@@ -60,7 +60,7 @@ class GraphServices():
                         - "adjacency": an object mapping each topic (string) to a list of connected topics (strings).
                     - Do not invent or rename topics.
                     - No self-links (topic must not list itself).
-                    - Prefer sparsity: only include a connection if the topics are clearly related.
+                    - Prefer sparsity: only include a connection if the topics are clearly related. Avoid creating a fully connected or overly dense graph.
                     - The graph is undirected: if A lists B, B should list A.
                     - JSON only. NO MARKDOWN
                     """
