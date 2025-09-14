@@ -130,7 +130,7 @@ class LLM():
 
         conversation.append({"role": "user", "content": user_prompt})
 
-        return self.get_chat_response(user_prompt, conversation_history = conversation, model_type = 'claude', system_prompt = system_prompt)
+        return self.get_chat_response(user_prompt, conversation_history = conversation, model_type = 'claude', system_prompt = system_prompt, isStreaming=False)
     
     def evaluate_answer(self, conversation_history : List[Dict]):
         """
@@ -151,7 +151,7 @@ class LLM():
         if conversation_history is None:
             return f"Error: Conversation history (assistant question and user answer) expected"
         
-        return self.get_chat_response(prompt, conversation_history = conversation_history, model_type = 'claude', system_prompt = prompt)
+        return self.get_chat_response(prompt, conversation_history = conversation_history, model_type = 'claude', system_prompt = prompt, isStreaming=False)
 
     def get_title(self, response : str):
         """
@@ -174,12 +174,7 @@ class LLM():
                 </CONVERSATION_HISTORY>
                 """
 
-        stream = self.get_chat_response(prompt, conversation_history = [{'role' : 'assistant', 'content' : response}])
-        title = ""
-        for s in stream:
-            title += s
-
-        return title
+        return self.get_chat_response(prompt, conversation_history = [{'role' : 'assistant', 'content' : response}], isStreaming=False)
 
 
 def main():
