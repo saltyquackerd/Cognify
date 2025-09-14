@@ -1,175 +1,292 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import ReactFlow, {
+  Node,
+  Edge,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  Controls,
+  MiniMap,
+  Background,
+  BackgroundVariant,
+  Connection,
+  ConnectionMode,
+  Panel,
+  Handle,
+  Position,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 
-interface Node {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  color: string;
-  size: number;
-}
+// Custom node component
+const CustomNode = ({ data }: { data: any }) => {
+  return (
+    <div 
+      className="px-4 py-2 shadow-md rounded-xl min-w-[120px] text-center backdrop-blur-sm relative"
+      style={{ 
+        backgroundColor: data.color || '#ffffff',
+        color: data.textColor || '#374151',
+        border: 'none'
+      }}
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="w-3 h-3 !bg-gray-400"
+      />
+      <div className="font-medium text-sm">{data.label}</div>
+      {data.category && (
+        <div className="text-xs opacity-70 mt-1">{data.category}</div>
+      )}
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-3 h-3 !bg-gray-400"
+      />
+    </div>
+  );
+};
 
-interface Edge {
-  from: string;
-  to: string;
-  label?: string;
-}
+const nodeTypes = {
+  customNode: CustomNode,
+};
 
 export default function KnowledgeGraphPage() {
   const router = useRouter();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Sample knowledge graph data
   useEffect(() => {
     const sampleNodes: Node[] = [
-      { id: 'ai', label: 'Artificial Intelligence', x: 400, y: 200, color: '#3B82F6', size: 40 },
-      { id: 'ml', label: 'Machine Learning', x: 200, y: 300, color: '#10B981', size: 35 },
-      { id: 'dl', label: 'Deep Learning', x: 100, y: 400, color: '#8B5CF6', size: 30 },
-      { id: 'nlp', label: 'Natural Language Processing', x: 600, y: 300, color: '#F59E0B', size: 35 },
-      { id: 'cv', label: 'Computer Vision', x: 300, y: 450, color: '#EF4444', size: 30 },
-      { id: 'nn', label: 'Neural Networks', x: 150, y: 150, color: '#06B6D4', size: 32 },
-      { id: 'transformers', label: 'Transformers', x: 700, y: 400, color: '#84CC16', size: 28 },
-      { id: 'gpt', label: 'GPT Models', x: 800, y: 200, color: '#F97316', size: 25 },
+      {
+        id: 'ai',
+        type: 'customNode',
+        position: { x: 400, y: 200 },
+        data: { 
+          label: 'Artificial Intelligence', 
+          color: '#E0E7FF', 
+          textColor: '#3730A3',
+          category: 'Core Concept'
+        }
+      },
+      {
+        id: 'ml',
+        type: 'customNode',
+        position: { x: 200, y: 300 },
+        data: { 
+          label: 'Machine Learning', 
+          color: '#D1FAE5', 
+          textColor: '#065F46',
+          category: 'Technology'
+        }
+      },
+      {
+        id: 'dl',
+        type: 'customNode',
+        position: { x: 100, y: 400 },
+        data: { 
+          label: 'Deep Learning', 
+          color: '#EDE9FE', 
+          textColor: '#581C87',
+          category: 'Method'
+        }
+      },
+      {
+        id: 'nlp',
+        type: 'customNode',
+        position: { x: 600, y: 300 },
+        data: { 
+          label: 'Natural Language Processing', 
+          color: '#FEF3C7', 
+          textColor: '#92400E',
+          category: 'Application'
+        }
+      },
+      {
+        id: 'cv',
+        type: 'customNode',
+        position: { x: 300, y: 450 },
+        data: { 
+          label: 'Computer Vision', 
+          color: '#FEE2E2', 
+          textColor: '#991B1B',
+          category: 'Application'
+        }
+      },
+      {
+        id: 'nn',
+        type: 'customNode',
+        position: { x: 150, y: 150 },
+        data: { 
+          label: 'Neural Networks', 
+          color: '#CFFAFE', 
+          textColor: '#155E75',
+          category: 'Technology'
+        }
+      },
+      {
+        id: 'transformers',
+        type: 'customNode',
+        position: { x: 700, y: 400 },
+        data: { 
+          label: 'Transformers', 
+          color: '#ECFDF5', 
+          textColor: '#166534',
+          category: 'Method'
+        }
+      },
+      {
+        id: 'gpt',
+        type: 'customNode',
+        position: { x: 800, y: 200 },
+        data: { 
+          label: 'GPT Models', 
+          color: '#FED7AA', 
+          textColor: '#9A3412',
+          category: 'Application'
+        }
+      },
     ];
 
     const sampleEdges: Edge[] = [
-      { from: 'ai', to: 'ml', label: 'includes' },
-      { from: 'ml', to: 'dl', label: 'subset of' },
-      { from: 'ml', to: 'cv', label: 'enables' },
-      { from: 'ai', to: 'nlp', label: 'includes' },
-      { from: 'dl', to: 'nn', label: 'uses' },
-      { from: 'nlp', to: 'transformers', label: 'uses' },
-      { from: 'transformers', to: 'gpt', label: 'powers' },
-      { from: 'nn', to: 'dl', label: 'foundation of' },
+      { 
+        id: 'e1-2', 
+        source: 'ai', 
+        target: 'ml', 
+        label: 'includes',
+        type: 'smoothstep',
+        animated: true,
+        style: { 
+          stroke: '#9CA3AF', 
+          strokeWidth: 3,
+          strokeDasharray: '0'
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
+      { 
+        id: 'e2-3', 
+        source: 'ml', 
+        target: 'dl', 
+        label: 'subset of',
+        type: 'smoothstep',
+        style: { 
+          stroke: '#A78BFA', 
+          strokeWidth: 2,
+          strokeDasharray: '5,5'
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
+      { 
+        id: 'e2-5', 
+        source: 'ml', 
+        target: 'cv', 
+        label: 'enables',
+        type: 'smoothstep',
+        style: { 
+          stroke: '#34D399', 
+          strokeWidth: 2
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
+      { 
+        id: 'e1-4', 
+        source: 'ai', 
+        target: 'nlp', 
+        label: 'includes',
+        type: 'smoothstep',
+        animated: true,
+        style: { 
+          stroke: '#9CA3AF', 
+          strokeWidth: 3
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
+      { 
+        id: 'e3-6', 
+        source: 'dl', 
+        target: 'nn', 
+        label: 'uses',
+        type: 'smoothstep',
+        style: { 
+          stroke: '#60A5FA', 
+          strokeWidth: 2
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
+      { 
+        id: 'e4-7', 
+        source: 'nlp', 
+        target: 'transformers', 
+        label: 'uses',
+        type: 'smoothstep',
+        style: { 
+          stroke: '#FBBF24', 
+          strokeWidth: 2
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
+      { 
+        id: 'e7-8', 
+        source: 'transformers', 
+        target: 'gpt', 
+        label: 'powers',
+        type: 'smoothstep',
+        animated: true,
+        style: { 
+          stroke: '#F87171', 
+          strokeWidth: 3
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
+      { 
+        id: 'e6-3', 
+        source: 'nn', 
+        target: 'dl', 
+        label: 'foundation of',
+        type: 'smoothstep',
+        style: { 
+          stroke: '#22D3EE', 
+          strokeWidth: 2,
+          strokeDasharray: '8,4'
+        },
+        labelStyle: { fill: '#6B7280', fontWeight: 500 }
+      },
     ];
 
     setNodes(sampleNodes);
     setEdges(sampleEdges);
+  }, [setNodes, setEdges]);
+
+  // Handle connection between nodes
+  const onConnect = useCallback(
+    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
+
+  // Handle node selection
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    setSelectedNode(node);
   }, []);
 
-  // Draw the knowledge graph
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw edges
-    ctx.strokeStyle = '#D1D5DB';
-    ctx.lineWidth = 2;
-    edges.forEach(edge => {
-      const fromNode = nodes.find(n => n.id === edge.from);
-      const toNode = nodes.find(n => n.id === edge.to);
-      
-      if (fromNode && toNode) {
-        ctx.beginPath();
-        ctx.moveTo(fromNode.x, fromNode.y);
-        ctx.lineTo(toNode.x, toNode.y);
-        ctx.stroke();
-
-        // Draw edge label
-        if (edge.label) {
-          const midX = (fromNode.x + toNode.x) / 2;
-          const midY = (fromNode.y + toNode.y) / 2;
-          ctx.fillStyle = '#6B7280';
-          ctx.font = '12px Inter';
-          ctx.textAlign = 'center';
-          ctx.fillText(edge.label, midX, midY - 5);
-        }
+  // Handle adding new nodes
+  const onAddNode = useCallback(() => {
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'customNode',
+      position: { x: Math.random() * 400 + 200, y: Math.random() * 400 + 200 },
+      data: {
+        label: 'New Concept',
+        color: '#F3E8FF',
+        textColor: '#6B21A8',
+        category: 'Custom'
       }
-    });
-
-    // Draw nodes
-    nodes.forEach(node => {
-      // Draw node circle
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, node.size, 0, 2 * Math.PI);
-      ctx.fillStyle = node.color;
-      ctx.fill();
-      
-      // Add border if selected
-      if (selectedNode?.id === node.id) {
-        ctx.strokeStyle = '#1F2937';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-      }
-
-      // Draw node label
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 12px Inter';
-      ctx.textAlign = 'center';
-      ctx.fillText(node.label, node.x, node.y + 4);
-    });
-  }, [nodes, edges, selectedNode]);
-
-  // Handle mouse events
-  const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    // Check if clicking on a node
-    const clickedNode = nodes.find(node => {
-      const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
-      return distance <= node.size;
-    });
-
-    if (clickedNode) {
-      setSelectedNode(clickedNode);
-      setIsDragging(true);
-      setDragOffset({
-        x: x - clickedNode.x,
-        y: y - clickedNode.y
-      });
-    } else {
-      setSelectedNode(null);
-    }
-  };
-
-  const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !selectedNode) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    // Update node position
-    setNodes(prevNodes =>
-      prevNodes.map(node =>
-        node.id === selectedNode.id
-          ? { ...node, x: x - dragOffset.x, y: y - dragOffset.y }
-          : node
-      )
-    );
-
-    setSelectedNode(prev => prev ? {
-      ...prev,
-      x: x - dragOffset.x,
-      y: y - dragOffset.y
-    } : null);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+    };
+    setNodes((nds) => [...nds, newNode]);
+  }, [setNodes]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -192,7 +309,10 @@ export default function KnowledgeGraphPage() {
             <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Export
             </button>
-            <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+            <button 
+              onClick={onAddNode}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
               Add Node
             </button>
           </div>
@@ -218,7 +338,7 @@ export default function KnowledgeGraphPage() {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Graph Density</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {((edges.length / (nodes.length * (nodes.length - 1))) * 100).toFixed(1)}%
+                    {nodes.length > 1 ? ((edges.length / (nodes.length * (nodes.length - 1))) * 100).toFixed(1) : '0.0'}%
                   </span>
                 </div>
               </div>
@@ -230,19 +350,23 @@ export default function KnowledgeGraphPage() {
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div>
                     <span className="text-sm font-medium text-gray-700">Label:</span>
-                    <p className="text-sm text-gray-900 mt-1">{selectedNode.label}</p>
+                    <p className="text-sm text-gray-900 mt-1">{selectedNode.data?.label}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Category:</span>
+                    <p className="text-sm text-gray-900 mt-1">{selectedNode.data?.category}</p>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-700">Connections:</span>
                     <p className="text-sm text-gray-900 mt-1">
-                      {edges.filter(e => e.from === selectedNode.id || e.to === selectedNode.id).length}
+                      {edges.filter(e => e.source === selectedNode.id || e.target === selectedNode.id).length}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700">Color:</span>
                     <div 
                       className="w-4 h-4 rounded-full border border-gray-300"
-                      style={{ backgroundColor: selectedNode.color }}
+                      style={{ backgroundColor: selectedNode.data?.color }}
                     />
                   </div>
                 </div>
@@ -273,29 +397,44 @@ export default function KnowledgeGraphPage() {
           </div>
         </div>
 
-        {/* Canvas Area */}
-        <div className="flex-1 relative bg-white">
-          <canvas
-            ref={canvasRef}
-            width={1200}
-            height={800}
-            className="w-full h-full cursor-pointer"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          />
-          
-          {/* Instructions */}
-          <div className="absolute top-4 right-4 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Instructions</h4>
-            <ul className="text-xs text-gray-600 space-y-1">
-              <li>• Click on nodes to select them</li>
-              <li>• Drag nodes to reposition them</li>
-              <li>• View node details in the sidebar</li>
-              <li>• Use Export to save the graph</li>
-            </ul>
-          </div>
+        {/* React Flow Area */}
+        <div className="flex-1 relative">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            nodeTypes={nodeTypes}
+            connectionMode={ConnectionMode.Loose}
+            fitView
+            className="bg-gray-50"
+          >
+            <Controls className="bg-white border border-gray-200 rounded-lg shadow-sm" />
+            <MiniMap 
+              className="bg-white border border-gray-200 rounded-lg shadow-sm"
+              nodeColor={(node) => node.data?.color || '#6366f1'}
+            />
+            <Background 
+              variant={BackgroundVariant.Dots} 
+              gap={20} 
+              size={1}
+              color="#e5e7eb"
+            />
+            
+            {/* Instructions Panel */}
+            <Panel position="top-right" className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm max-w-xs">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Instructions</h4>
+              <ul className="text-xs text-gray-600 space-y-1">
+                <li>• Drag nodes to reposition them</li>
+                <li>• Click nodes to select and view details</li>
+                <li>• Drag from node handles to create connections</li>
+                <li>• Use controls to zoom and fit view</li>
+                <li>• Add new nodes with the button above</li>
+              </ul>
+            </Panel>
+          </ReactFlow>
         </div>
       </div>
     </div>
