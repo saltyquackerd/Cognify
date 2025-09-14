@@ -75,18 +75,7 @@ class LLM():
 
             elif model_type == 'anthropic' or model_type == 'claude':
                 system_prompt = system_prompt or 'You are a helpful AI Assistant.'
-<<<<<<< Updated upstream
 
-                with self.anthropic_client.messages.stream(
-                    max_tokens=self.max_tokens,
-                    messages=messages,
-                    model=model,
-                    system=system_prompt or "You are a helpful AI assistant."
-                ) as stream:
-                    for chunk in stream.text_stream:
-                        if chunk: 
-                            yield chunk
-=======
                 if isStreaming:
                     with self.anthropic_client.messages.stream(
                         max_tokens=self.max_tokens,
@@ -103,7 +92,6 @@ class LLM():
                         model=model,
                         system=system_prompt
                     )
->>>>>>> Stashed changes
             else:
                 yield f'Error: Cerebras or Anthropic model type expected.'
             
