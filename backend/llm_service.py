@@ -75,7 +75,6 @@ class LLM():
 
             elif model_type == 'anthropic' or model_type == 'claude':
                 system_prompt = system_prompt or 'You are a helpful AI Assistant.'
-
                 if isStreaming:
                     with self.anthropic_client.messages.stream(
                         max_tokens=self.max_tokens,
