@@ -150,7 +150,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
       // Handle streaming response (Server-Sent Events)
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      let assistantMessageId = '';
+      let placeholderAssistantId = '';
       let fullResponse = '';
 
       if (reader) {
@@ -168,9 +168,9 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                 
                 if (data.status === 'started') {
                   // Create initial assistant message
-                  assistantMessageId = data.user_message_id + '_assistant';
+                  placeholderAssistantId = data.user_message_id + '_assistant';
                   const assistantMessage: Message = {
-                    id: assistantMessageId,
+                    id: placeholderAssistantId,
                     content: '',
                     role: 'assistant',
                     timestamp: new Date(),
@@ -180,12 +180,11 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                 } else if (data.status === 'chunk') {
                   // Stream content to the assistant message
                   fullResponse += data.content;
-                  useStore.getState().updateMessageContent(assistantMessageId, fullResponse);
+                  useStore.getState().updateMessageContent(placeholderAssistantId, fullResponse);
                   updateConversationLastMessage(conversationId, fullResponse);
                 } else if (data.status === 'completed') {
                   // Finalize the message
-                  assistantMessageId = data.chatbot_message_id;
-                  useStore.getState().updateMessageId(assistantMessageId, data.chatbot_message_id);
+                  useStore.getState().updateMessageId(placeholderAssistantId, data.chatbot_message_id);
                   
                   // Update conversation title if it was generated
                   if (data.title && data.title !== 'New conversation') {
@@ -297,7 +296,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
                 <div className="max-w-md">
                   <h2 className="text-4xl text-gray-900 mb-4">
-                    {activeConversation ? `Welcome to ${activeConversation.title}` : 'Welcome to Cognify'}
+                    Welcome to Cognify
                   </h2>
                   <p className="text-gray-600 mb-8">
                     {selectedConversation ? 'Start chatting in this conversation.' : 'Select a conversation from the sidebar to start learning.'}
@@ -333,10 +332,10 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                         <div className="flex items-center space-x-1 self-end mt-1">
                           <button
                             onClick={() => handleOpenSidePopup(message)}
-                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-full border border-gray-300 hover:border-gray-400 transition-all duration-200"
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-full border border-gray-200 hover:border-gray-400 transition-all duration-200"
                             title="Quiz me on this message"
                           >
-                            Quiz me
+                            Quiz »
                           </button>
                         </div>
                       )}

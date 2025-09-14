@@ -32,24 +32,56 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
   const [isResizing, setIsResizing] = useState(false);
   const [hasQuiz, setHasQuiz] = useState(false);
   const [askedInitial, setAskedInitial] = useState(false);
+  const [isAskingQuestion, setIsAskingQuestion] = useState(false);
+  // Guard to ensure we only auto-ask once per quiz id (handles React StrictMode double-effect)
+  const hasAskedForQuizRef = useRef<Record<string, boolean>>({});
   const resizeRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Function to scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Reset state when messageId changes (popup opens for different message)
+  useEffect(() => {
+    console.log('SidePopup messageId changed, resetting state');
+    setMessages([]);
+    setAskedInitial(false);
+    setHasQuiz(false);
+    setIsAskingQuestion(false);
+  }, [messageId]);
 
   // Ensure quiz exists and ask initial question
   useEffect(() => {
     console.log('SidePopup useEffect - messageId:', messageId);
     console.log('SidePopup useEffect - quizConversationId:', quizConversationId);
+    console.log('SidePopup useEffect - askedInitial:', askedInitial);
     if (!messageId) return;
     if (quizConversationId) {
       console.log('Quiz exists, setting hasQuiz to true');
       setHasQuiz(true);
-      if (!askedInitial) {
-        console.log('Asking initial question');
+      // Use ref guard to avoid duplicate initial load (e.g., StrictMode double-run)
+      if (!hasAskedForQuizRef.current[quizConversationId] && !isAskingQuestion) {
+        console.log('Loading quiz messages or asking initial question');
+        setIsAskingQuestion(true);
+        hasAskedForQuizRef.current[quizConversationId] = true;
         (async () => {
           try {
-            await askQuestion(quizConversationId);
+            // First try to load existing messages
+            const hasExistingMessages = await loadQuizMessages(quizConversationId);
+            if (!hasExistingMessages) {
+              // No existing messages, ask a new question
+              console.log('No existing messages, asking initial question');
+              await askQuestion(quizConversationId);
+            } else {
+              console.log('Loaded existing quiz messages');
+            }
             setAskedInitial(true);
           } catch (e) {
-            console.error('Error asking initial question:', e);
+            console.error('Error loading quiz or asking initial question:', e);
+          } finally {
+            setIsAskingQuestion(false);
           }
         })();
       }
@@ -58,9 +90,41 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       setHasQuiz(false);
       setAskedInitial(false);
     }
-  }, [messageId, quizConversationId, askedInitial]);
+  }, [messageId, quizConversationId]);
+
+  const loadQuizMessages = async (quizId: string) => {
+    console.log('loadQuizMessages called for quizId:', quizId);
+    try {
+      const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/messages`);
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.error('Failed to load quiz messages', response.status, errText);
+        throw new Error('Failed to load quiz messages');
+      }
+      const data = await response.json();
+      console.log('loadQuizMessages response:', data);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        // Convert backend messages to frontend Message format
+        const messages: Message[] = data.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role,
+          timestamp: new Date(msg.timestamp)
+        }));
+        console.log('Loaded existing quiz messages:', messages);
+        setMessages(messages);
+        return true; // Has existing messages
+      }
+      return false; // No existing messages
+    } catch (error) {
+      console.error('Error loading quiz messages:', error);
+      return false;
+    }
+  };
 
   const askQuestion = async (quizId: string) => {
+    console.log('askQuestion called for quizId:', quizId);
     const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/ask-question`, {
       method: 'POST'
     });
@@ -70,13 +134,20 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       throw new Error('Failed to ask quiz question');
     }
     const data = await response.json();
+    console.log('askQuestion response:', data);
     const questionMessage: Message = {
       id: data.quiz_message_id || (Date.now() + 1).toString(),
       content: typeof data.quiz_questions === 'string' ? data.quiz_questions : String(data.quiz_questions),
       role: 'assistant',
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, questionMessage]);
+    console.log('Adding question message:', questionMessage);
+    setMessages(prev => {
+      console.log('Previous messages:', prev);
+      const newMessages = [...prev, questionMessage];
+      console.log('New messages:', newMessages);
+      return newMessages;
+    });
   };
 
 
@@ -128,6 +199,11 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     }
   }, [width, onWidthChange]);
 
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
   const handleSendMessage = async (content: string) => {
     if (!messageId) return;
 
@@ -160,7 +236,9 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit quiz answer');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`Failed to submit quiz answer: ${errorMessage}`);
       }
 
       const data = await response.json();
@@ -343,17 +421,22 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
             </div>
           </div>
         )}
+        {/* Invisible element to scroll to */}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Field */}
-      <div className="border-t border-gray-200 p-4 space-y-3">
-        <InputField
-          onSendMessage={handleSendMessage}
-          disabled={isLoading}
-          placeholder={width < 390 ? "Type your answer..." : "Type your answer to the question..."}
-          showInstructions={false}
-        />
-        <div className="flex items-center gap-2">
+      <div className="p-4 space-y-3">
+        <div className="w-full">
+          <InputField
+            onSendMessage={handleSendMessage}
+            disabled={isLoading}
+            placeholder={width < 390 ? "Type your answer..." : "Type your answer to the question..."}
+            showInstructions={false}
+            sidePopupOpen={true}
+          />
+        </div>
+        <div className="flex items-center gap-3">
           <button
             onClick={() => {
               if (!messageId) return;
@@ -362,16 +445,26 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
                 askQuestion(quizId);
               }
             }}
-            className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 text-sm font-medium bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200 rounded-lg shadow-sm hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
             disabled={!hasQuiz || !messageId || isLoading}
           >
-            Quiz me again
+            <span className="flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                <path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              New quiz question
+            </span>
           </button>
           <button
             onClick={onClose}
-            className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+            className="px-4 py-2.5 text-sm font-medium bg-white text-gray-700 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-400 hover:shadow-md transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]"
           >
-            Back
+            <span className="flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                <path d="M19 12H5m7-7l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Back
+            </span>
           </button>
         </div>
       </div>
