@@ -5,6 +5,9 @@ import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 from llm_service import LLM
+from database import DatabaseService
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
 # Load environment variables
 load_dotenv()
@@ -12,8 +15,9 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Initialize LLM service
+# Initialize services
 llm_service = LLM()
+db_service = DatabaseService()
 
 # In-memory storage for demo purposes (use a database in production)
 # Data structure: users -> sessions -> quizzes
@@ -21,9 +25,119 @@ users = {}  # user_id -> user_data
 sessions = {}  # session_id -> session_data  
 quizzes = {}  # quiz_id -> quizzes
 
+@app.route('/api/auth/google', methods=['POST'])
+def google_auth():
+    """Handle Google OAuth authentication"""
+    try:
+        data = request.get_json()
+        credential = data.get('credential')
+        user_info = data.get('user_info')
+        
+        if not credential:
+            return jsonify({'error': 'Google credential is required'}), 400
+        
+        # Verify the Google token
+        try:
+            # Verify the token with Google
+            idinfo = id_token.verify_oauth2_token(
+                credential, 
+                requests.Request(), 
+                os.getenv('GOOGLE_CLIENT_ID')
+            )
+            
+            # Extract user information from verified token
+            google_id = idinfo['sub']
+            email = idinfo['email']
+            name = idinfo['name']
+            picture = idinfo.get('picture', '')
+            
+        except ValueError as e:
+            return jsonify({'error': 'Invalid Google token'}), 401
+        
+        # Use MongoDB if available, otherwise fallback to in-memory
+        if db_service.is_connected():
+            # Create or get existing user
+            user_id = db_service.create_user(
+                email=email,
+                google_id=google_id,
+                name=name,
+                picture=picture
+            )
+            
+            if not user_id:
+                return jsonify({'error': 'Failed to create user'}), 500
+            
+            # Update last login
+            db_service.update_user_login(user_id)
+            
+            # Create a new session
+            session_id = db_service.create_session(user_id)
+            
+            # Get user data
+            user = db_service.get_user(user_id)
+            
+            return jsonify({
+                'user': {
+                    'id': user_id,
+                    'email': user['email'],
+                    'name': user['name'],
+                    'picture': user['picture']
+                },
+                'session_id': session_id
+            })
+        else:
+            # Fallback to in-memory storage
+            # Check if user already exists
+            existing_user_id = None
+            for uid, user_data in users.items():
+                if user_data.get('google_id') == google_id:
+                    existing_user_id = uid
+                    break
+            
+            if existing_user_id:
+                user_id = existing_user_id
+            else:
+                # Create new user
+                user_id = str(uuid.uuid4())
+                users[user_id] = {
+                    'id': user_id,
+                    'email': email,
+                    'name': name,
+                    'picture': picture,
+                    'google_id': google_id,
+                    'created_at': datetime.now().isoformat(),
+                    'sessions': []
+                }
+            
+            # Create session
+            session_id = str(uuid.uuid4())
+            sessions[session_id] = {
+                'id': session_id,
+                'user_id': user_id,
+                'created_at': datetime.now().isoformat(),
+                'messages': [],
+                'quizzes': [],
+                'conversation_history': []
+            }
+            
+            users[user_id]['sessions'].append(session_id)
+            
+            return jsonify({
+                'user': {
+                    'id': user_id,
+                    'email': email,
+                    'name': name,
+                    'picture': picture
+                },
+                'session_id': session_id
+            })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/users', methods=['POST'])
 def create_user():
-    """Create a new user"""
+    """Create a new user (legacy endpoint)"""
     try:
         data = request.get_json()
         username = data.get('username', '')
@@ -31,25 +145,37 @@ def create_user():
         if not username:
             return jsonify({'error': 'Username is required'}), 400
         
-        # Check if username already exists
-        for user_id, user_data in users.items():
-            if user_data.get('username') == username:
+        # Use MongoDB if available
+        if db_service.is_connected():
+            user_id = db_service.create_user(username=username)
+            if not user_id:
                 return jsonify({'error': 'Username already exists'}), 409
-        
-        # Create new user
-        user_id = str(uuid.uuid4())
-        users[user_id] = {
-            'id': user_id,
-            'username': username,
-            'created_at': datetime.now().isoformat(),
-            'sessions': []
-        }
-        
-        return jsonify({
-            'user_id': user_id,
-            'username': username,
-            'created_at': users[user_id]['created_at']
-        })
+            
+            user = db_service.get_user(user_id)
+            return jsonify({
+                'user_id': user_id,
+                'username': user['username'],
+                'created_at': user['created_at']
+            })
+        else:
+            # Fallback to in-memory storage
+            for user_id, user_data in users.items():
+                if user_data.get('username') == username:
+                    return jsonify({'error': 'Username already exists'}), 409
+            
+            user_id = str(uuid.uuid4())
+            users[user_id] = {
+                'id': user_id,
+                'username': username,
+                'created_at': datetime.now().isoformat(),
+                'sessions': []
+            }
+            
+            return jsonify({
+                'user_id': user_id,
+                'username': username,
+                'created_at': users[user_id]['created_at']
+            })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
