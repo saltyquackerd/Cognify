@@ -272,6 +272,18 @@ def create_quiz_thread(session_id):
         if not start_assistant_message_id:
             return jsonify({'error': 'start_assistant_message_id is required'}), 400
         
+        # Check if a quiz already exists for this start_assistant_message
+        session_quizzes = sessions[session_id]['quizzes']
+        for quiz_id in session_quizzes:
+            if quiz_id in quizzes and quizzes[quiz_id]['start_assistant_message']['message_id'] == start_assistant_message_id:
+                # Return existing quiz info
+                return jsonify({
+                    'quiz_id': quiz_id,
+                    'session_id': session_id,
+                    'user_id': quizzes[quiz_id]['user_id'],
+                    'created_at': quizzes[quiz_id]['created_at'],
+                })
+        
         # Find the start_user_message_id (the message above the assistant message)
         start_user_message_id = None
         messages = sessions[session_id]['messages']
@@ -603,6 +615,47 @@ def get_quiz_messages_endpoint(quiz_id):
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def conversation_history_to_string(session_id):
+    """
+    Convert conversation history for a session into a readable string format.
+    
+    Args:
+        session_id (str): The ID of the session to get conversation history from
+    
+    Returns:
+        str: Formatted conversation history as a string, or empty string if session not found
+    """
+    try:
+        if session_id not in sessions:
+            return ""
+        
+        session_data = sessions[session_id]
+        conversation_history = session_data.get('conversation_history', [])
+        
+        if not conversation_history:
+            return ""
+        
+        # Format each message in the conversation
+        formatted_messages = []
+        for _, message in enumerate(conversation_history):
+            role = message.get('role', 'unknown')
+            content = message.get('content', '')
+            
+            if role == 'user':
+                formatted_messages.append(f"User: {content}")
+            elif role == 'assistant':
+                formatted_messages.append(f"Assistant: {content}")
+            else:
+                formatted_messages.append(f"{role.title()}: {content}")
+        
+        # Join all messages with newlines
+        return "\n".join(formatted_messages)
+        
+    except Exception as e:
+        print(f"Error converting conversation history to string for session {session_id}: {e}")
+        return ""
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
