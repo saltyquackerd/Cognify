@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import InputField from './InputField';
 import { useStore } from './store/useStore';
 import SidePopup from './SidePopup';
@@ -29,6 +29,10 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     createOrSelectEmptyConversation,
     conversations
   } = useStore();
+  
+  const activeConversation = useMemo(() => {
+    return conversations.find(conv => conv.id === selectedConversationId) || null;
+  }, [conversations, selectedConversationId]);
   
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
@@ -73,6 +77,12 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   const [currentSidePopupWidth, setCurrentSidePopupWidth] = useState(384);
   
   console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
+  console.log('ChatBox render - selectedConversationId:', selectedConversationId);
+  console.log('ChatBox render - selectedConversation:', selectedConversation);
+  console.log('ChatBox render - activeConversation:', activeConversation);
+  console.log('ChatBox render - currentMessages length:', currentMessages.length);
+  console.log('ChatBox render - conversations array:', conversations);
+  console.log('ChatBox render - conversations length:', conversations.length);
 
   const handleSendMessage = async (content: string) => {
     console.log('handleSendMessage called with content:', content);
@@ -83,8 +93,11 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     if (!conversationId) {
       try {
         console.log('Creating or selecting empty conversation for user: 1');
+        console.log('Current selectedConversationId:', selectedConversationId);
+        console.log('Current conversations:', conversations);
         const newConv = await createOrSelectEmptyConversation('1');
         console.log('Successfully created conversation:', newConv);
+        console.log('New selectedConversationId after creation:', useStore.getState().selectedConversationId);
         conversationId = newConv.id;
       } catch (error) {
         console.error('Failed to create conversation:', error);
@@ -132,24 +145,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
         throw new Error('Failed to send message');
       }
 
-      const data = await response.json();
-      
-      // Create assistant message from backend response
-      const assistantMessage: Message = {
-        id: data.chatbot_message_id || (Date.now() + 1).toString(),
-        content: data.chat_response,
-        role: 'assistant',
-        timestamp: new Date(),
-        conversationId: conversationId,
-      };
-      
-      addMessage(Message);
-      updateConversationLastMessage(conversationId, assistantMessage.content);
-      
-      // Update conversation title if it was generated
-      if (data.title && data.title !== 'New conversation') {
-        useStore.getState().updateConversation(conversationId, { title: data.title });
-      // Handle streaming response
+      // Handle streaming response (Server-Sent Events)
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let assistantMessageId = '';
@@ -176,14 +172,14 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                     content: '',
                     role: 'assistant',
                     timestamp: new Date(),
-                    conversationId: selectedConversationId,
+                    conversationId: conversationId,
                   };
                   addMessage(assistantMessage);
                 } else if (data.status === 'chunk') {
                   // Stream content to the assistant message
                   fullResponse += data.content;
                   useStore.getState().updateMessageContent(assistantMessageId, fullResponse);
-                  updateConversationLastMessage(selectedConversationId, fullResponse);
+                  updateConversationLastMessage(conversationId, fullResponse);
                 } else if (data.status === 'completed') {
                   // Finalize the message
                   assistantMessageId = data.chatbot_message_id;
@@ -191,7 +187,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                   
                   // Update conversation title if it was generated
                   if (data.title && data.title !== 'New conversation') {
-                    useStore.getState().updateConversation(selectedConversationId, { title: data.title });
+                    useStore.getState().updateConversation(conversationId, { title: data.title });
                   }
                 } else if (data.status === 'error') {
                   throw new Error(data.error);
@@ -245,11 +241,11 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           <div className="flex items-center justify-between">
             <div>
                 <h1 className="text-xl text-gray-900">
-                  {selectedConversation ? selectedConversation.title : 'Cognify'}
+                  {activeConversation ? activeConversation.title : 'Cognify'}
                 </h1>
-              {selectedConversation && (
+              {activeConversation && (
                 <p className="text-sm text-gray-600 mt-1">
-                  {selectedConversation.lastMessage}
+                  {activeConversation.lastMessage}
                 </p>
               )}
             </div>
@@ -274,7 +270,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
                 <div className="max-w-md">
                   <h2 className="text-4xl text-gray-900 mb-4">
-                    {selectedConversation ? `Welcome to ${selectedConversation.title}` : 'Welcome to Cognify'}
+                    {activeConversation ? `Welcome to ${activeConversation.title}` : 'Welcome to Cognify'}
                   </h2>
                   <p className="text-gray-600 mb-8">
                     {selectedConversation ? 'Start chatting in this conversation.' : 'Select a conversation from the sidebar to start learning.'}

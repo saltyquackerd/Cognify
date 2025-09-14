@@ -423,24 +423,20 @@ export const useStore = create<StoreState>((set, get) => ({
 
   createOrSelectEmptyConversation: async (userId) => {
     console.log('createOrSelectEmptyConversation called for user:', userId);
-    // First, check if there's already an empty conversation
-    const emptyConv = get().findEmptyConversation();
-    if (emptyConv) {
-      console.log('Found existing empty conversation, selecting it:', emptyConv.id);
-      // Select the existing empty conversation
-      get().selectConversation(emptyConv.id);
-      return emptyConv;
-    }
-    
-    console.log('No empty conversation found, creating new one');
-    // If no empty conversation exists, create a new one
+    // Always create a new conversation when starting fresh
+    // This prevents reusing old conversations that might have messages
+    console.log('Creating new conversation for fresh start');
     return await get().createNewConversation(userId);
   },
 
   // Computed values
   get selectedConversation() {
     const { conversations, selectedConversationId } = get();
-    return conversations.find(conv => conv.id === selectedConversationId) || null;
+    console.log('selectedConversation computed - selectedConversationId:', selectedConversationId);
+    console.log('selectedConversation computed - conversations:', conversations);
+    const found = conversations.find(conv => conv.id === selectedConversationId);
+    console.log('selectedConversation computed - found:', found);
+    return found || null;
   },
 
   getConversationById: (id) => {
