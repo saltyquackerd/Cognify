@@ -92,7 +92,7 @@ export default function MessageList() {
       {/* Header with Logo/Brand */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {!isCollapsed && <span className="text-lg font-inter text-gray-900">Cognify</span>}
+          {!isCollapsed && <span className="text-lg font-cognify text-gray-900">Cognify</span>}
         </div>
         
         <button
@@ -111,7 +111,7 @@ export default function MessageList() {
           <div className="p-4 border-b border-gray-200">
             <button
               onClick={handleNewChat}
-              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium border border-gray-200 text-gray-700"
+              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium text-gray-700"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

@@ -12,6 +12,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
+.font-cognify {
+  font-family: var(--font-poppins), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 
 body {
   background: var(--background);
