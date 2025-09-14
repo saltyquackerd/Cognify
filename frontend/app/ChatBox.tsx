@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import InputField from './InputField';
 import { useStore } from './store/useStore';
 import SidePopup from './SidePopup';
+import { API_URLS } from '../lib/api';
 
 interface Message {
   id: string;
@@ -138,7 +139,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
 
     try {
       // Send message to backend with streaming
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch(API_URLS.CHAT(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -350,9 +351,9 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                         setIsGeneratingTags(true);
                         try {
                           console.log('Requesting tags for session ID:', activeConversation.id);
-                          console.log('Full URL:', `http://localhost:5000/api/sessions/${activeConversation.id}/tags`);
+                          console.log('Full URL:', API_URLS.SESSION_TAGS(activeConversation.id));
                           
-                          const response = await fetch(`http://localhost:5000/api/sessions/${activeConversation.id}/tags`, {
+                          const response = await fetch(API_URLS.SESSION_TAGS(activeConversation.id), {
                             method: 'GET',
                             headers: {
                               'Content-Type': 'application/json',

@@ -18,7 +18,7 @@ import ReactFlow, {
   Handle,
   Position,
 } from 'reactflow';
-import 'reactflow/dist/style.css';
+import { API_URLS } from '../../lib/api';
 
 // Custom node component
 const CustomNode = ({ data }: { data: any }) => {
@@ -139,7 +139,7 @@ export default function KnowledgeGraphPage() {
     const loadKnowledgeGraph = async () => {
       try {
         // Call your backend API endpoint
-        const response = await fetch('http://localhost:5000/api/knowledge-graph');
+        const response = await fetch(API_URLS.KNOWLEDGE_GRAPH());
         
         if (!response.ok) {
           throw new Error('Failed to fetch knowledge graph data');

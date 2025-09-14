@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import InputField from './InputField';
 import { useStore } from './store/useStore';
+import { API_URLS } from '../lib/api';
 
 interface Message {
   id: string;
@@ -95,7 +96,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
   const loadQuizMessages = async (quizId: string) => {
     console.log('loadQuizMessages called for quizId:', quizId);
     try {
-      const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/messages`);
+      const response = await fetch(API_URLS.QUIZ_MESSAGES(quizId));
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         console.error('Failed to load quiz messages', response.status, errText);
@@ -125,7 +126,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
 
   const askQuestion = async (quizId: string) => {
     console.log('askQuestion called for quizId:', quizId);
-    const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/ask-question`, {
+    const response = await fetch(API_URLS.QUIZ_ASK_QUESTION(quizId), {
       method: 'POST'
     });
     if (!response.ok) {
@@ -234,7 +235,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
 
       // For quiz, send answers to the non-streaming endpoint
       const quizId = quizConversationId;
-      const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/answer`, {
+      const response = await fetch(API_URLS.QUIZ_ANSWER(quizId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
