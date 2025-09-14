@@ -25,115 +25,62 @@ users = {}  # user_id -> user_data
 sessions = {}  # session_id -> session_data  
 quizzes = {}  # quiz_id -> quizzes
 
-@app.route('/api/auth/google', methods=['POST'])
-def google_auth():
-    """Handle Google OAuth authentication"""
-    try:
-        data = request.get_json()
-        credential = data.get('credential')
-        user_info = data.get('user_info')
-        
-        if not credential:
-            return jsonify({'error': 'Google credential is required'}), 400
-        
-        # Verify the Google token
-        try:
-            # Verify the token with Google
-            idinfo = id_token.verify_oauth2_token(
-                credential, 
-                requests.Request(), 
-                os.getenv('GOOGLE_CLIENT_ID')
-            )
-            
-            # Extract user information from verified token
-            google_id = idinfo['sub']
-            email = idinfo['email']
-            name = idinfo['name']
-            picture = idinfo.get('picture', '')
-            
-        except ValueError as e:
-            return jsonify({'error': 'Invalid Google token'}), 401
-        
-        # Use MongoDB if available, otherwise fallback to in-memory
-        if db_service.is_connected():
-            # Create or get existing user
-            user_id = db_service.create_user(
-                email=email,
-                google_id=google_id,
-                name=name,
-                picture=picture
-            )
-            
-            if not user_id:
-                return jsonify({'error': 'Failed to create user'}), 500
-            
-            # Update last login
-            db_service.update_user_login(user_id)
-            
-            # Create a new session
-            session_id = db_service.create_session(user_id)
-            
-            # Get user data
-            user = db_service.get_user(user_id)
-            
-            return jsonify({
-                'user': {
-                    'id': user_id,
-                    'email': user['email'],
-                    'name': user['name'],
-                    'picture': user['picture']
-                },
-                'session_id': session_id
-            })
-        else:
-            # Fallback to in-memory storage
-            # Check if user already exists
-            existing_user_id = None
-            for uid, user_data in users.items():
-                if user_data.get('google_id') == google_id:
-                    existing_user_id = uid
-                    break
-            
-            if existing_user_id:
-                user_id = existing_user_id
-            else:
-                # Create new user
-                user_id = str(uuid.uuid4())
-                users[user_id] = {
-                    'id': user_id,
-                    'email': email,
-                    'name': name,
-                    'picture': picture,
-                    'google_id': google_id,
-                    'created_at': datetime.now().isoformat(),
-                    'sessions': []
-                }
-            
-            # Create session
-            session_id = str(uuid.uuid4())
-            sessions[session_id] = {
-                'id': session_id,
-                'user_id': user_id,
-                'created_at': datetime.now().isoformat(),
-                'messages': [],
-                'quizzes': [],
-                'conversation_history': []
+# Add test data
+def initialize_test_data():
+    """Initialize test data for development and testing"""
+    global users, sessions, quizzes
+    
+    # Test user
+    users['1'] = {
+        'id': '1',
+        'username': 'alice',
+        'created_at': '2024-01-15T10:30:00',
+        'sessions': ['session1', 'session2']
+    }
+    
+    # Test sessions
+    sessions['session1'] = {
+        'id': 'session1',
+        'user_id': '1',
+        'created_at': '2024-01-15T10:30:00',
+        'title': 'React component',
+        'messages': [
+            {
+                'id': 'msg1',
+                'user_message': 'How to create a button component?',
+                'chat_response': 'Here is how to create a button component...',
+                'timestamp': '2024-01-15T10:30:00'
             }
-            
-            users[user_id]['sessions'].append(session_id)
-            
-            return jsonify({
-                'user': {
-                    'id': user_id,
-                    'email': email,
-                    'name': name,
-                    'picture': picture
-                },
-                'session_id': session_id
-            })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        ],
+        'quizzes': [],
+        'conversation_history': [
+            {"role": "user", "content": "How to create a button component?"},
+            {"role": "assistant", "content": "Here is how to create a button component..."}
+        ]
+    }
+    
+    sessions['session2'] = {
+        'id': 'session2',
+        'user_id': '1', 
+        'created_at': '2024-01-14T15:45:00',
+        'title': 'JavaScript patterns',
+        'messages': [
+            {
+                'id': 'msg2',
+                'user_message': 'What are async/await best practices?',
+                'chat_response': 'Async/await best practices include...',
+                'timestamp': '2024-01-14T15:45:00'
+            }
+        ],
+        'quizzes': [],
+        'conversation_history': [
+            {"role": "user", "content": "What are async/await best practices?"},
+            {"role": "assistant", "content": "Async/await best practices include..."}
+        ]
+    }
+
+# Initialize test data
+initialize_test_data()
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
@@ -211,6 +158,7 @@ def create_session(user_id):
             'id': session_id,
             'user_id': user_id,
             'created_at': datetime.now().isoformat(),
+            'title': '',
             'messages': [],
             'quizzes': [],
             'conversation_history': []
@@ -254,6 +202,11 @@ def chat():
         session['conversation_history'].append({"role": "user", "content": user_message})
         session['conversation_history'].append({"role": "assistant", "content": chat_response})
         
+        # Set title after first user question if title is still empty
+        if not session['title']:
+            summary = f"User message: {user_message}\nChat response: {chat_response}"
+            session['title'] = llm_service.get_title(summary)
+        
         # Store the conversation
         message_id = str(uuid.uuid4())
         session['messages'].append({
@@ -267,7 +220,8 @@ def chat():
             'session_id': session_id,
             'message_id': message_id,
             'chat_response': chat_response,
-            'user_id': session['user_id']
+            'user_id': session['user_id'],
+            'title': session['title']
         })
         
     except Exception as e:
@@ -439,72 +393,70 @@ def continue_quiz_conversation(quiz_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/session/<session_id>', methods=['GET'])
-def get_session(session_id):
-    """Get session history"""
+def get_all_conversations(user_id):
+    """Get all conversations for a specific user with id, lastMessage, and timestamp"""
     try:
-        if session_id not in sessions:
-            return jsonify({'error': 'Session not found'}), 404
+        conversations = []
         
-        session = sessions[session_id]
-        session_quizzes = []
+        # Get user's sessions directly
+        if user_id not in users:
+            return []
+            
+        user_sessions = users[user_id].get('sessions', [])
         
-        for quiz_id in session['quizzes']:
-            if quiz_id in quizzes:
-                quiz = quizzes[quiz_id]
-                session_quizzes.append({
-                    'quiz_id': quiz_id,
-                    'completed': quiz['completed']
-                })
+        for session_id in user_sessions:
+            if session_id not in sessions:
+                continue
+                
+            session_data = sessions[session_id]
+            
+            # Get the last message from conversation history
+            last_message = ""
+            timestamp = session_data.get('created_at', '')
+            
+            # Check if there are messages in the session
+            if session_data.get('messages') and len(session_data['messages']) > 0:
+                # Get the last message from the messages array
+                last_message_obj = session_data['messages'][-1]
+                last_message = last_message_obj.get('user_message', '')
+                timestamp = last_message_obj.get('timestamp', timestamp)
+            elif session_data.get('conversation_history') and len(session_data['conversation_history']) > 0:
+                # Fallback to conversation history if no messages array
+                # Find the last user message
+                for msg in reversed(session_data['conversation_history']):
+                    if msg.get('role') == 'user':
+                        last_message = msg.get('content', '')
+                        break
+            
+            conversations.append({
+                'id': session_id,
+                'title': session_data.get('title', ''),
+                'lastMessage': last_message,
+                'timestamp': timestamp,
+                'isActive': False
+            })
         
-        return jsonify({
-            'session_id': session_id,
-            'user_id': session['user_id'],
-            'created_at': session['created_at'],
-            'messages': session['messages'],
-            'quizzes': session_quizzes
-        })
+        # Sort by timestamp (most recent first)
+        conversations.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return conversations
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error getting conversations for user {user_id}: {e}")
+        return []
 
-@app.route('/api/users/<user_id>/sessions', methods=['GET'])
-def get_user_sessions(user_id):
-    """Get all sessions for a user"""
+@app.route('/api/users/<user_id>/conversations', methods=['GET'])
+def get_all_conversations_endpoint(user_id):
+    """Get all conversations for a specific user"""
     try:
         if user_id not in users:
             return jsonify({'error': 'User not found'}), 404
-        
-        user = users[user_id]
-        user_sessions = []
-        
-        for session_id in user['sessions']:
-            if session_id in sessions:
-                session = sessions[session_id]
-                user_sessions.append({
-                    'session_id': session_id,
-                    'created_at': session['created_at'],
-                    'message_count': len(session['messages']),
-                    'quiz_count': len(session['quizzes'])
-                })
-        
-        return jsonify({
-            'user_id': user_id,
-            'username': user['username'],
-            'sessions': user_sessions
-        })
+            
+        conversations = get_all_conversations(user_id)
+        return jsonify(conversations)
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'cerebras_configured': llm_service.is_api_configured(),
-        'available_models': llm_service.get_available_models()
-    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

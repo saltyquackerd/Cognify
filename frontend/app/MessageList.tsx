@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore, Conversation } from './store/useStore';
 
@@ -10,10 +10,16 @@ export default function MessageList() {
     conversations, 
     addConversation, 
     selectConversation, 
-    deleteConversation 
+    deleteConversation,
+    loadConversations
   } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+  // Load conversations from API on mount
+  useEffect(() => {
+    loadConversations('1');
+  }, [loadConversations]);
 
   const filteredConversations = conversations.filter((conv: Conversation) =>
     conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

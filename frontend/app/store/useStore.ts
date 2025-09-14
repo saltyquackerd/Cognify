@@ -30,6 +30,7 @@ interface StoreState {
   deleteConversation: (id: string) => void;
   selectConversation: (id: string) => void;
   setConversations: (conversations: Conversation[]) => void;
+  loadConversations: (userId: string) => Promise<void>;
   
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
@@ -43,63 +44,9 @@ interface StoreState {
 
 export const useStore = create<StoreState>((set, get) => ({
   // Initial state
-  conversations: [
-    {
-      id: '1',
-      title: 'Welcome to Cognify',
-      lastMessage: 'Hello! How can I help you today?',
-      timestamp: new Date('2024-01-15T10:30:00'),
-      isActive: true
-    },
-    {
-      id: '2',
-      title: 'JavaScript help',
-      lastMessage: 'What are the best practices for error handling?',
-      timestamp: new Date('2024-01-14T15:45:00')
-    },
-    {
-      id: '3',
-      title: 'CSS questions',
-      lastMessage: 'When should I use CSS Grid over Flexbox?',
-      timestamp: new Date('2024-01-13T09:20:00')
-    },
-    {
-      id: '4',
-      title: 'TypeScript generics',
-      lastMessage: 'How do I create a generic function that works with arrays?',
-      timestamp: new Date('2024-01-12T14:10:00')
-    },
-    {
-      id: '5',
-      title: 'Next.js optimization',
-      lastMessage: 'What are the best ways to optimize a Next.js app?',
-      timestamp: new Date('2024-01-11T16:30:00')
-    }
-  ],
-  selectedConversationId: '1',
-  messages: [
-    {
-      id: 'msg1',
-      content: 'Hello! How can I help you today?',
-      role: 'assistant',
-      timestamp: new Date('2024-01-15T10:30:00'),
-      conversationId: '1'
-    },
-    {
-      id: 'msg2',
-      content: 'What are the best practices for error handling?',
-      role: 'user',
-      timestamp: new Date('2024-01-14T15:45:00'),
-      conversationId: '2'
-    },
-    {
-      id: 'msg3',
-      content: 'Great question! Here are some key best practices for error handling in JavaScript...',
-      role: 'assistant',
-      timestamp: new Date('2024-01-14T15:46:00'),
-      conversationId: '2'
-    }
-  ],
+  conversations: [],
+  selectedConversationId: null,
+  messages: [],
 
   // Conversation actions
   addConversation: (conversation) => {
@@ -144,6 +91,30 @@ export const useStore = create<StoreState>((set, get) => ({
 
   setConversations: (conversations) => {
     set({ conversations });
+  },
+
+  loadConversations: async (userId) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/conversations');
+      if (!response.ok) {
+        throw new Error('Failed to fetch conversations');
+      }
+      const conversations = await response.json();
+      
+      // Transform the API response to match our Conversation interface
+      const transformedConversations = conversations.map((conv: any) => ({
+        id: conv.id.toString(),
+        title: conv.title || 'Untitled Conversation',
+        lastMessage: conv.last_message || '',
+        timestamp: new Date(conv.created_at || conv.timestamp),
+        isActive: false
+      }));
+      
+      set({ conversations: transformedConversations });
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      // Keep the existing conversations if API fails
+    }
   },
 
   // Message actions
