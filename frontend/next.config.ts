@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Ensure React Flow works with static export
+  transpilePackages: ['reactflow'],
   // Remove experimental.esmExternals as it's not supported with Turbopack
   // and not needed for static export
 };

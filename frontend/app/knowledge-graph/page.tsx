@@ -2,7 +2,31 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import ReactFlow, {
+import dynamic from 'next/dynamic';
+import { API_URLS } from '../../lib/api';
+
+// Dynamically import ReactFlow to ensure it only loads on client side
+const ReactFlow = dynamic(
+  () => import('reactflow').then((mod) => {
+    // Import CSS when ReactFlow loads
+    import('reactflow/dist/style.css');
+    return mod.default;
+  }),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading interactive graph...</p>
+        </div>
+      </div>
+    )
+  }
+);
+
+// Import React Flow components
+const {
   Node,
   Edge,
   addEdge,
@@ -17,8 +41,7 @@ import ReactFlow, {
   Panel,
   Handle,
   Position,
-} from 'reactflow';
-import { API_URLS } from '../../lib/api';
+} = require('reactflow');
 
 // Custom node component
 const CustomNode = ({ data }: { data: { label: string; color?: string; textColor?: string; size?: number; gradient?: string } }) => {
@@ -136,6 +159,7 @@ export default function KnowledgeGraphPage() {
 
   // Load knowledge graph data
   useEffect(() => {
+    console.log('KnowledgeGraphPage mounted, React Flow should be interactive');
     const loadKnowledgeGraph = async () => {
       try {
         // Call your backend API endpoint
@@ -300,12 +324,16 @@ export default function KnowledgeGraphPage() {
 
   // Handle connection between nodes
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    (params: Connection) => {
+      console.log('Connection created:', params);
+      setEdges((eds) => addEdge(params, eds));
+    },
     [setEdges]
   );
 
   // Handle node selection and highlighting
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    console.log('Node clicked:', node.id);
     setSelectedNode(node);
     
     // Get connected node IDs
