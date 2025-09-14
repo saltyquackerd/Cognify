@@ -31,25 +31,15 @@ except Exception as e:
 # In-memory storage for demo purposes (use a database in production)
 # Data structure: users -> sessions -> quizzes
 users = {}  # user_id -> user_data
+users['1'] = {
+    'id': '1',
+    'username': 'Zailey',
+    'created_at': '2025-09-15T10:30:00',
+    'sessions': []
+}
 sessions = {}  # session_id -> session_data  
 quizzes = {}  # quiz_id -> quizzes
 tags = set()  # all tags
-
-# Add test data
-def initialize_test_data():
-    """Initialize test data for development and testing"""
-    global users, sessions, quizzes
-    
-    # Test user
-    users['1'] = {
-        'id': '1',
-        'username': 'Zailey',
-        'created_at': '2025-09-15T10:30:00',
-        'sessions': []
-    }
-
-# Initialize test data
-initialize_test_data()
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
