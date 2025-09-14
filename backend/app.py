@@ -21,6 +21,63 @@ users = {}  # user_id -> user_data
 sessions = {}  # session_id -> session_data  
 quizzes = {}  # quiz_id -> quizzes
 
+# Add test data
+def initialize_test_data():
+    """Initialize test data for development and testing"""
+    global users, sessions, quizzes
+    
+    # Test user
+    users['1'] = {
+        'id': '1',
+        'username': 'alice',
+        'created_at': '2024-01-15T10:30:00',
+        'sessions': ['session1', 'session2']
+    }
+    
+    # Test sessions
+    sessions['session1'] = {
+        'id': 'session1',
+        'user_id': '1',
+        'created_at': '2024-01-15T10:30:00',
+        'title': 'React component',
+        'messages': [
+            {
+                'id': 'msg1',
+                'user_message': 'How to create a button component?',
+                'chat_response': 'Here is how to create a button component...',
+                'timestamp': '2024-01-15T10:30:00'
+            }
+        ],
+        'quizzes': [],
+        'conversation_history': [
+            {"role": "user", "content": "How to create a button component?"},
+            {"role": "assistant", "content": "Here is how to create a button component..."}
+        ]
+    }
+    
+    sessions['session2'] = {
+        'id': 'session2',
+        'user_id': '1', 
+        'created_at': '2024-01-14T15:45:00',
+        'title': 'JavaScript patterns',
+        'messages': [
+            {
+                'id': 'msg2',
+                'user_message': 'What are async/await best practices?',
+                'chat_response': 'Async/await best practices include...',
+                'timestamp': '2024-01-14T15:45:00'
+            }
+        ],
+        'quizzes': [],
+        'conversation_history': [
+            {"role": "user", "content": "What are async/await best practices?"},
+            {"role": "assistant", "content": "Async/await best practices include..."}
+        ]
+    }
+
+# Initialize test data
+initialize_test_data()
+
 @app.route('/api/users', methods=['POST'])
 def create_user():
     """Create a new user"""
@@ -320,52 +377,34 @@ def continue_quiz_conversation(quiz_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# @app.route('/api/session/<session_id>', methods=['GET'])
-# def get_session(session_id):
-#     """Get session history"""
-#     try:
-#         if session_id not in sessions:
-#             return jsonify({'error': 'Session not found'}), 404
-        
-#         session = sessions[session_id]
-#         session_quizzes = []
-        
-#         for quiz_id in session['quizzes']:
-#             if quiz_id in quizzes:
-#                 quiz = quizzes[quiz_id]
-#                 session_quizzes.append({
-#                     'quiz_id': quiz_id,
-#                     'completed': quiz['completed']
-#                 })
-        
-#         return jsonify({
-#             'session_id': session_id,
-#             'user_id': session['user_id'],
-#             'created_at': session['created_at'],
-#             'messages': session['messages'],
-#             'quizzes': session_quizzes
-#         })
-        
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
-
-def get_all_conversations():
-    """Get all conversations with id, lastMessage, and timestamp"""
+def get_all_conversations(user_id):
+    """Get all conversations for a specific user with id, lastMessage, and timestamp"""
     try:
         conversations = []
         
-        for session_id, session_data in sessions.items():
+        # Get user's sessions directly
+        if user_id not in users:
+            return []
+            
+        user_sessions = users[user_id].get('sessions', [])
+        
+        for session_id in user_sessions:
+            if session_id not in sessions:
+                continue
+                
+            session_data = sessions[session_id]
+            
             # Get the last message from conversation history
             last_message = ""
             timestamp = session_data.get('created_at', '')
             
             # Check if there are messages in the session
-            if session_data.get('messages'):
+            if session_data.get('messages') and len(session_data['messages']) > 0:
                 # Get the last message from the messages array
                 last_message_obj = session_data['messages'][-1]
                 last_message = last_message_obj.get('user_message', '')
                 timestamp = last_message_obj.get('timestamp', timestamp)
-            elif session_data.get('conversation_history'):
+            elif session_data.get('conversation_history') and len(session_data['conversation_history']) > 0:
                 # Fallback to conversation history if no messages array
                 # Find the last user message
                 for msg in reversed(session_data['conversation_history']):
@@ -385,47 +424,21 @@ def get_all_conversations():
         return conversations
         
     except Exception as e:
-        print(f"Error getting all conversations: {e}")
+        print(f"Error getting conversations for user {user_id}: {e}")
         return []
 
-@app.route('/api/conversations', methods=['GET'])
-def get_all_conversations_endpoint():
-    """Get all conversations endpoint"""
+@app.route('/api/users/<user_id>/conversations', methods=['GET'])
+def get_all_conversations_endpoint(user_id):
+    """Get all conversations for a specific user"""
     try:
-        conversations = get_all_conversations()
+        if user_id not in users:
+            return jsonify({'error': 'User not found'}), 404
+            
+        conversations = get_all_conversations(user_id)
         return jsonify(conversations)
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-# @app.route('/api/users/<user_id>/sessions', methods=['GET'])
-# def get_user_sessions(user_id):
-#     """Get all sessions for a user"""
-#     try:
-#         if user_id not in users:
-#             return jsonify({'error': 'User not found'}), 404
-        
-#         user = users[user_id]
-#         user_sessions = []
-        
-#         for session_id in user['sessions']:
-#             if session_id in sessions:
-#                 session = sessions[session_id]
-#                 user_sessions.append({
-#                     'session_id': session_id,
-#                     'created_at': session['created_at'],
-#                     'message_count': len(session['messages']),
-#                     'quiz_count': len(session['quizzes'])
-#                 })
-        
-#         return jsonify({
-#             'user_id': user_id,
-#             'username': user['username'],
-#             'sessions': user_sessions
-#         })
-        
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
