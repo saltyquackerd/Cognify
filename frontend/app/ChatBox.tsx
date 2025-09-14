@@ -372,15 +372,15 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
             {/* Messages Container */}
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
             {currentMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center mt-16">
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center mt-24">
                 <div className="w-full max-w-4xl">
-                  <h2 className="text-4xl text-gray-900 mb-2 animate-fade-in-up">
+                  <h2 className="text-4xl text-gray-900 mb-6 animate-fade-in-up">
                     Welcome to <span className="relative inline-block px-3 py-2">
                       <span className="relative z-10 text-white animate-pulse-text">Cognify</span>
                       <span className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 transform rounded-4xl -skew-y-[2deg] opacity-80 shadow-lg animate-gradient-shift"></span>
                     </span>
                   </h2>
-                  <p className="text-gray-600 mb-2">
+                  <p className="text-gray-600 mb-6">
                     {selectedConversation ? 'Start chatting in this conversation.' : ''}
                   </p>
                   
