@@ -1,6 +1,6 @@
 import requests
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from cerebras.cloud.sdk import Cerebras
 import anthropic
@@ -21,8 +21,9 @@ class LLM():
             api_key=os.environ.get("CLAUDE_API_KEY")
         )
         self.max_tokens=1000
+        self.graph = GraphIngestor()
     
-    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'cerebras', system_prompt: str = None):
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'cerebras', system_prompt: str = None, isStreaming : bool = True):
         """
         Get response from Cerebras API for a given message with conversation context
         
@@ -56,17 +57,25 @@ class LLM():
         
         try:
             if model_type == 'cerebras':
-                stream = self.cerebras_client.chat.completions.create(
-                    messages=messages,
-                    model=model,
-                    stream=True
-                )
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
+                if isStreaming:
+                    stream = self.cerebras_client.chat.completions.create(
+                        messages=messages,
+                        model=model,
+                        stream=True
+                    )
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+                else:
+                    return self.cerebras_client.chat.completions.create(
+                        messages=messages,
+                        model=model,
+                        stream=False
+                    )
 
             elif model_type == 'anthropic' or model_type == 'claude':
                 system_prompt = system_prompt or 'You are a helpful AI Assistant.'
+<<<<<<< Updated upstream
 
                 with self.anthropic_client.messages.stream(
                     max_tokens=self.max_tokens,
@@ -77,6 +86,24 @@ class LLM():
                     for chunk in stream.text_stream:
                         if chunk: 
                             yield chunk
+=======
+                if isStreaming:
+                    with self.anthropic_client.messages.stream(
+                        max_tokens=self.max_tokens,
+                        messages=messages,
+                        model=model,
+                        system=system_prompt
+                    ) as stream:
+                        for chunk in stream.text_stream:
+                            if chunk: 
+                                yield chunk
+                else:
+                    return client.messages.create(max_tokens=self.max_tokens,
+                        messages=messages,
+                        model=model,
+                        system=system_prompt
+                    )
+>>>>>>> Stashed changes
             else:
                 yield f'Error: Cerebras or Anthropic model type expected.'
             
@@ -96,12 +123,12 @@ class LLM():
             List[Dict]: List containing one long-answer question
         """
 
-        system_prompt = """"You are a question writer.
-                            Write EXACTLY ONE brief long-answer question.
-                            If there are HIGHLIGHTS, prioritize HIGHLIGHTS appearing in CONTEXT
-                            Output must be related to CONTEXT—no rationale, no preface, no JSON, no bullets.
-                            Do not repeat past questions.
-                            No examples. No answers. No special tokens"""
+        system_prompt = """You are a question writer.
+                        Write EXACTLY ONE brief long-answer question.
+                        If there are HIGHLIGHTS, prioritize HIGHLIGHTS appearing in CONTEXT
+                        Output must be related to CONTEXT—no rationale, no preface, no JSON, no bullets.
+                        Do not repeat past questions.
+                        No examples. No answers. No special tokens"""
 
         user_prompt = f"""CONTEXT:
                         {response_text}
@@ -119,7 +146,7 @@ class LLM():
 
         return self.get_chat_response(user_prompt, conversation_history = conversation, model_type = 'claude', system_prompt = system_prompt)
     
-    def evaluate_answer(self, conversation_history : List[Dict], question: str, user_answer: str):
+    def evaluate_answer(self, conversation_history : List[Dict]):
         """
         Returns evaluation of a long-answer response using LLM
         """
@@ -167,6 +194,9 @@ class LLM():
             title += s
 
         return title
+    
+    def summarize(self, conversation_history : List[Dict]):
+        get_chat_response()
 
 
 def main():
@@ -229,7 +259,7 @@ def main():
 
     for answer in answers:
         history.append({'role':'user','content':answer})
-        eval_gen = llm.evaluate_answer(history,response,answer)
+        eval_gen = llm.evaluate_answer(history)
         print('== EVALUATION FOR ANSWER:', answer, "== ")
         print()
         for s in eval_gen:
