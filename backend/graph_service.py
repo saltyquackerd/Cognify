@@ -21,10 +21,11 @@ class GraphServices():
     def get_tags(self, chat_history): # get tags
         prompt = """You are an information extractor.
                 Read the conversation history and return a strict JSON object with a key "topics"
-                that maps to an array of strings.
-
+                that maps to an array of strings. The goal is to extract the key concepts of the conversation history.
+                
                 Guidelines:
                 - Include broad topics (e.g. "Computer Science") and narrow ones (e.g. "Dijkstra").
+                - Generate around 3-5 key topics.
                 - Do not include duplicates.
                 - Output JSON ONLY, no commentary.
                 """
@@ -54,11 +55,11 @@ class GraphServices():
                     Rules:
                     - Use the `topics` array EXACTLY AS GIVEN and IN THE SAME ORDER.
                     - Output keys:
-                    - "topics": echo the array exactly,
-                    - "adjacency": an object mapping each topic (string) to a list of connected topics (strings).
+                        - "topics": echo the array exactly,
+                        - "adjacency": an object mapping each topic (string) to a list of connected topics (strings).
                     - Do not invent or rename topics.
                     - No self-links (topic must not list itself).
-                    - Prefer sparsity: include a connection only when it's clearly warranted by context.
+                    - Prefer sparsity: only include a connection if the topics are clearly related.
                     - The graph is undirected: if A lists B, B should list A.
                     - JSON only. NO MARKDOWN
                     """
