@@ -1,32 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
-import { API_URLS } from '../../lib/api';
-
-// Dynamically import ReactFlow to ensure it only loads on client side
-const ReactFlow = dynamic(
-  () => import('reactflow').then((mod) => {
-    // Import CSS when ReactFlow loads
-    import('reactflow/dist/style.css');
-    return mod.default;
-  }),
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading interactive graph...</p>
-        </div>
-      </div>
-    )
-  }
-);
-
-// Import React Flow components
-const {
+import ReactFlow, {
   Node,
   Edge,
   addEdge,
@@ -41,7 +17,8 @@ const {
   Panel,
   Handle,
   Position,
-} = require('reactflow');
+} from 'reactflow';
+import { API_URLS } from '../../lib/api';
 
 // Custom node component
 const CustomNode = ({ data }: { data: { label: string; color?: string; textColor?: string; size?: number; gradient?: string } }) => {
@@ -156,6 +133,30 @@ export default function KnowledgeGraphPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const reactFlowRef = useRef<any>(null);
+
+  // Ensure component is mounted on client side
+  useEffect(() => {
+    setMounted(true);
+    console.log('Component mounted, React Flow should be interactive now');
+  }, []);
+
+  // Additional effect to ensure React Flow is properly initialized
+  useEffect(() => {
+    if (mounted) {
+      console.log('React Flow should be fully initialized now');
+      // Force a re-render to ensure React Flow is properly mounted
+      setTimeout(() => {
+        console.log('React Flow initialization complete');
+        if (reactFlowRef.current) {
+          console.log('React Flow ref is set:', reactFlowRef.current);
+        } else {
+          console.log('React Flow ref is not set');
+        }
+      }, 100);
+    }
+  }, [mounted]);
 
   // Load knowledge graph data
   useEffect(() => {
@@ -504,19 +505,35 @@ export default function KnowledgeGraphPage() {
               </div>
             </div>
           </div>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onPaneClick={onPaneClick}
-            nodeTypes={nodeTypes}
-            connectionMode={ConnectionMode.Loose}
-            fitView
-            className="bg-gradient-to-br from-gray-50 to-gray-100"
-          >
+          {!mounted && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 font-medium">Loading interactive graph...</p>
+              </div>
+            </div>
+          )}
+          {mounted && (
+            <div>
+              <div style={{ position: 'absolute', top: 10, left: 10, background: 'red', color: 'white', padding: '5px', zIndex: 1000 }}>
+                React Flow is mounted and should be interactive!
+              </div>
+              <ReactFlow
+                ref={reactFlowRef}
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={onNodeClick}
+                onPaneClick={onPaneClick}
+                nodeTypes={nodeTypes}
+                connectionMode={ConnectionMode.Loose}
+                fitView
+                className="bg-gradient-to-br from-gray-50 to-gray-100"
+                style={{ width: '100%', height: '100%' }}
+                defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+              >
             <Controls className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-lg" />
             <MiniMap 
               className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-lg"
@@ -558,7 +575,9 @@ export default function KnowledgeGraphPage() {
                 </li>
               </ul>
             </Panel>
-          </ReactFlow>
+            </ReactFlow>
+            </div>
+          )}
         </div>
       </div>
     </div>
