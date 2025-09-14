@@ -49,6 +49,10 @@ interface StoreState {
   getMessagesForConversation: (conversationId: string) => Message[];
   updateConversationLastMessage: (conversationId: string, lastMessage: string) => void;
   
+  // Helper functions
+  findEmptyConversation: () => Conversation | null;
+  createOrSelectEmptyConversation: (userId: string) => Promise<Conversation>;
+  
   // Computed values
   selectedConversation: Conversation | null;
   getConversationById: (id: string) => Conversation | null;
@@ -395,6 +399,42 @@ export const useStore = create<StoreState>((set, get) => ({
           : conv
       )
     }));
+  },
+
+  // Helper functions
+  findEmptyConversation: () => {
+    console.log('findEmptyConversation called');
+    const { conversations, messagesByConversation } = get();
+    console.log('Total conversations:', conversations.length);
+    console.log('MessagesByConversation keys:', Object.keys(messagesByConversation));
+    
+    const emptyConv = conversations.find(conv => {
+      // Check if this conversation has been initialized in messagesByConversation
+      const hasMessagesEntry = conv.id in messagesByConversation;
+      const messages = messagesByConversation[conv.id] || [];
+      // A conversation is empty if it either has no messages entry OR has 0 messages
+      const isEmpty = !hasMessagesEntry || messages.length === 0;
+      console.log(`Checking conversation ${conv.id} (${conv.title}): hasEntry: ${hasMessagesEntry}, ${messages.length} messages, isEmpty: ${isEmpty}`);
+      return isEmpty;
+    }) || null;
+    console.log('Found empty conversation:', emptyConv);
+    return emptyConv;
+  },
+
+  createOrSelectEmptyConversation: async (userId) => {
+    console.log('createOrSelectEmptyConversation called for user:', userId);
+    // First, check if there's already an empty conversation
+    const emptyConv = get().findEmptyConversation();
+    if (emptyConv) {
+      console.log('Found existing empty conversation, selecting it:', emptyConv.id);
+      // Select the existing empty conversation
+      get().selectConversation(emptyConv.id);
+      return emptyConv;
+    }
+    
+    console.log('No empty conversation found, creating new one');
+    // If no empty conversation exists, create a new one
+    return await get().createNewConversation(userId);
   },
 
   // Computed values

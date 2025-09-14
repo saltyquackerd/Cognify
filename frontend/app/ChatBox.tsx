@@ -25,7 +25,9 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     getMessagesForConversation,
     // loadMessagesForConversation, // now triggered from store.selectConversation
     messagesByConversation,
-    updateConversationLastMessage
+    updateConversationLastMessage,
+    createOrSelectEmptyConversation,
+    conversations
   } = useStore();
   
   const [isLoading, setIsLoading] = useState(false);
@@ -37,6 +39,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
 
   // Update current messages when conversation changes
   useEffect(() => {
@@ -72,18 +75,44 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
 
   const handleSendMessage = async (content: string) => {
-    if (!selectedConversationId) return;
+    console.log('handleSendMessage called with content:', content);
+    console.log('selectedConversationId:', selectedConversationId);
+    let conversationId = selectedConversationId;
+    
+    // Create new conversation if none is selected
+    if (!conversationId) {
+      try {
+        console.log('Creating or selecting empty conversation for user: 1');
+        const newConv = await createOrSelectEmptyConversation('1');
+        console.log('Successfully created conversation:', newConv);
+        conversationId = newConv.id;
+      } catch (error) {
+        console.error('Failed to create conversation:', error);
+        console.error('Error details:', error instanceof Error ? error.message : String(error));
+        // Create a fallback local conversation if API fails
+        const fallbackConv = {
+          id: `local-${Date.now()}`,
+          title: 'New conversation',
+          lastMessage: 'Start a new conversation...',
+          timestamp: new Date(),
+          isActive: true
+        };
+        console.log('Using fallback conversation:', fallbackConv);
+        useStore.getState().addConversation(fallbackConv);
+        conversationId = fallbackConv.id;
+      }
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
       role: 'user',
       timestamp: new Date(),
-      conversationId: selectedConversationId,
+      conversationId: conversationId,
     };
 
     addMessage(userMessage);
-    updateConversationLastMessage(selectedConversationId, content);
+    updateConversationLastMessage(conversationId, content);
     setIsLoading(true);
 
     try {
@@ -95,7 +124,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
         },
         body: JSON.stringify({
           message: content,
-          session_id: selectedConversationId
+          session_id: conversationId
         }),
       });
 
@@ -103,6 +132,23 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
         throw new Error('Failed to send message');
       }
 
+      const data = await response.json();
+      
+      // Create assistant message from backend response
+      const assistantMessage: Message = {
+        id: data.chatbot_message_id || (Date.now() + 1).toString(),
+        content: data.chat_response,
+        role: 'assistant',
+        timestamp: new Date(),
+        conversationId: conversationId,
+      };
+      
+      addMessage(Message);
+      updateConversationLastMessage(conversationId, assistantMessage.content);
+      
+      // Update conversation title if it was generated
+      if (data.title && data.title !== 'New conversation') {
+        useStore.getState().updateConversation(conversationId, { title: data.title });
       // Handle streaming response
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -167,10 +213,10 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
         content: "I'm sorry, I'm having trouble connecting to the server. Please try again later.",
         role: 'assistant',
         timestamp: new Date(),
-        conversationId: selectedConversationId,
+        conversationId: conversationId,
       };
       addMessage(assistantMessage);
-      updateConversationLastMessage(selectedConversationId, assistantMessage.content);
+      updateConversationLastMessage(conversationId, assistantMessage.content);
     } finally {
       setIsLoading(false);
     }

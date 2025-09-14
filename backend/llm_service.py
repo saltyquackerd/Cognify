@@ -80,7 +80,6 @@ class LLM():
             else:
                 yield f'Error: Cerebras or Anthropic model type expected.'
             
-            
         except requests.exceptions.RequestException as e:
             yield f"Error communicating with Cerebras API: {str(e)}"
     

@@ -12,7 +12,7 @@ export default function MessageList() {
     selectConversation, 
     deleteConversation,
     loadConversations,
-    createNewConversation
+    createOrSelectEmptyConversation
   } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -47,7 +47,8 @@ export default function MessageList() {
 
   const handleNewChat = async () => {
     try {
-      await createNewConversation('1'); // Using user ID '1' for now
+      console.log('MessageList - Creating or selecting empty conversation');
+      await createOrSelectEmptyConversation('1'); // Using user ID '1' for now
     } catch (error) {
       console.error('Failed to create new conversation:', error);
       // Fallback to local creation if backend fails
