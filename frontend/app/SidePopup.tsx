@@ -22,9 +22,13 @@ interface SidePopupProps {
 }
 
 export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange, messageId, onResponseCountChange }: SidePopupProps) {
-  const { selectedConversationId } = useStore();
+  const { selectedConversationId, conversations } = useStore();
   // Subscribe to the specific quiz id for this message so changes trigger re-render
   const quizConversationId = useStore((state) => (messageId ? state.messageQuizMap[messageId] : null));
+  
+  // Get the current conversation's quiz mode
+  const currentConversation = conversations.find(conv => conv.id === selectedConversationId);
+  const isStrictMode = currentConversation?.quizMode === 'strict';
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -317,7 +321,9 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
               <div
                 className={`max-w-[70%] rounded-2xl px-4 py-3 ${
                   message.role === 'user'
-                    ? 'bg-blue-600 text-white'
+                    ? isStrictMode
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-900'
                 }`}
               >
@@ -404,7 +410,9 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
             <div
               className={`max-w-[80%] rounded-2xl px-3 py-2 ${
                 message.role === 'user'
-                  ? 'bg-blue-600 text-white'
+                  ? isStrictMode
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-900'
               }`}
             >

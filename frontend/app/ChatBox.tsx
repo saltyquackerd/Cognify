@@ -412,7 +412,9 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                       <div
                         className={`rounded-2xl px-4 py-3 ${
                           message.role === 'user'
-                            ? 'bg-blue-600 text-white'
+                            ? activeConversation?.quizMode === 'strict'
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-blue-600 text-white'
                             : 'bg-white text-gray-900'
                         }`}
                       >
@@ -426,7 +428,11 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                         <div className="flex items-center space-x-1 self-end mt-1">
                           <button
                             onClick={() => handleOpenSidePopup(message)}
-                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-full border border-gray-200 hover:border-gray-400 transition-all duration-200"
+                            className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 ${
+                              activeConversation?.quizMode === 'strict'
+                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-700 border-purple-200 hover:border-purple-400'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200 hover:border-gray-400'
+                            }`}
                             title="Quiz me on this message"
                           >
                             Quiz »

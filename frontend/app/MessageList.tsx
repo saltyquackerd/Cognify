@@ -187,14 +187,22 @@ export default function MessageList() {
                       key={conversation.id}
                       className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
                         conversation.isActive
-                          ? 'bg-blue-50 border-l-2 border-blue-500'
+                          ? conversation.quizMode === 'strict'
+                            ? 'bg-purple-50 border-l-2 border-purple-500'
+                            : 'bg-blue-50 border-l-2 border-blue-500'
                           : 'hover:bg-gray-50'
                       }`}
                       onClick={() => handleSelectConversation(conversation.id)}
                     >
                       {/* Chat Icon */}
                       <div className="flex-shrink-0">
-                        <svg className={`w-4 h-4 ${conversation.isActive ? 'text-blue-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-4 h-4 ${
+                          conversation.isActive 
+                            ? conversation.quizMode === 'strict' 
+                              ? 'text-purple-500' 
+                              : 'text-blue-500'
+                            : 'text-gray-400'
+                        }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
                       </div>
@@ -203,14 +211,18 @@ export default function MessageList() {
                       <div className="flex-1 min-w-0">
                         <h3 className={`text-sm font-medium truncate ${
                           conversation.isActive 
-                            ? 'text-blue-900' 
+                            ? conversation.quizMode === 'strict'
+                              ? 'text-purple-900'
+                              : 'text-blue-900'
                             : 'text-gray-900'
                         }`}>
                           {conversation.title}
                         </h3>
                         <p className={`text-xs truncate mt-0.5 ${
                           conversation.isActive 
-                            ? 'text-blue-700' 
+                            ? conversation.quizMode === 'strict'
+                              ? 'text-purple-700'
+                              : 'text-blue-700'
                             : 'text-gray-500'
                         }`}>
                           {conversation.lastMessage}
