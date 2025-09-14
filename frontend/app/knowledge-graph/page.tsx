@@ -107,6 +107,12 @@ const nodeTypes = {
   customNode: CustomNode,
 };
 
+// Add a simple default node type as fallback
+const defaultNodeTypes = {
+  default: CustomNode,
+  customNode: CustomNode,
+};
+
 // Tame, cohesive color palette with muted tones
 const getNodeColor = (topic: string): { gradient: string; textColor: string } => {
   const colorSchemes = [
@@ -160,7 +166,11 @@ export default function KnowledgeGraphPage() {
 
   // Load knowledge graph data
   useEffect(() => {
+    if (!mounted) return; // Only load data after component is mounted
+    
     console.log('KnowledgeGraphPage mounted, React Flow should be interactive');
+    console.log('Current nodes:', nodes);
+    console.log('Current edges:', edges);
     const loadKnowledgeGraph = async () => {
       try {
         // Call your backend API endpoint
@@ -172,11 +182,16 @@ export default function KnowledgeGraphPage() {
         
         const data = await response.json();
         console.log('Knowledge graph API response:', data);
+        console.log('Topics from API:', data.topics);
+        console.log('Edges from API:', data.edges);
         
         // Transform API data to React Flow format
         // Backend returns: { topics: [...], edges: [[source, target], ...] }
         const topics = data.topics || [];
         const edgeList = data.edges || [];
+        
+        console.log('Processed topics:', topics);
+        console.log('Processed edges:', edgeList);
         
         // Calculate node degrees (number of connections)
         const nodeDegrees = new Map<string, number>();
@@ -228,7 +243,7 @@ export default function KnowledgeGraphPage() {
           const colorScheme = getNodeColor(topic);
           return {
             id: topic,
-            type: 'customNode',
+            type: 'default', // Use default type instead of customNode
             position: { x, y },
             data: {
               label: topic,
@@ -268,6 +283,8 @@ export default function KnowledgeGraphPage() {
           };
         });
         
+        console.log('Setting nodes:', transformedNodes);
+        console.log('Setting edges:', transformedEdges);
         setNodes(transformedNodes);
         setEdges(transformedEdges);
         
@@ -278,7 +295,7 @@ export default function KnowledgeGraphPage() {
         const fallbackNodes: Node[] = [
           {
             id: 'ai',
-            type: 'customNode',
+            type: 'default',
             position: { x: 400, y: 200 },
             data: { 
               label: 'Artificial Intelligence', 
@@ -291,7 +308,7 @@ export default function KnowledgeGraphPage() {
           },
           {
             id: 'ml',
-            type: 'customNode',
+            type: 'default',
             position: { x: 200, y: 300 },
             data: { 
               label: 'Machine Learning', 
@@ -315,13 +332,21 @@ export default function KnowledgeGraphPage() {
           }
         ];
         
+        console.log('Using fallback data - nodes:', fallbackNodes);
+        console.log('Using fallback data - edges:', fallbackEdges);
         setNodes(fallbackNodes);
         setEdges(fallbackEdges);
       }
     };
     
     loadKnowledgeGraph();
-  }, [setNodes, setEdges]);
+  }, [mounted, setNodes, setEdges]);
+
+  // Debug effect to track nodes and edges changes
+  useEffect(() => {
+    console.log('Nodes changed:', nodes);
+    console.log('Edges changed:', edges);
+  }, [nodes, edges]);
 
   // Handle connection between nodes
   const onConnect = useCallback(
@@ -415,7 +440,7 @@ export default function KnowledgeGraphPage() {
     const colorScheme = getNodeColor('New Concept');
     const newNode: Node = {
       id: `node-${Date.now()}`,
-      type: 'customNode',
+      type: 'default',
       position: { x: Math.random() * 400 + 200, y: Math.random() * 400 + 200 },
       data: {
         label: 'New Concept',
@@ -516,7 +541,7 @@ export default function KnowledgeGraphPage() {
           {mounted && (
             <div>
               <div style={{ position: 'absolute', top: 10, left: 10, background: 'red', color: 'white', padding: '5px', zIndex: 1000 }}>
-                React Flow is mounted and should be interactive!
+                React Flow is mounted and should be interactive! Nodes: {nodes.length}, Edges: {edges.length}
               </div>
               <ReactFlow
                 ref={reactFlowRef}
@@ -527,12 +552,10 @@ export default function KnowledgeGraphPage() {
                 onConnect={onConnect}
                 onNodeClick={onNodeClick}
                 onPaneClick={onPaneClick}
-                nodeTypes={nodeTypes}
-                connectionMode={ConnectionMode.Loose}
+                nodeTypes={defaultNodeTypes}
                 fitView
                 className="bg-gradient-to-br from-gray-50 to-gray-100"
                 style={{ width: '100%', height: '100%' }}
-                defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               >
             <Controls className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-lg" />
             <MiniMap 
