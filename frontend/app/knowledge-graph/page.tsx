@@ -22,28 +22,36 @@ import 'reactflow/dist/style.css';
 
 // Custom node component
 const CustomNode = ({ data }: { data: any }) => {
+  const size = data.size || 60;
+  const radius = size / 2;
+  
   return (
     <div 
-      className="px-4 py-2 shadow-md rounded-xl min-w-[120px] text-center backdrop-blur-sm relative"
+      className="shadow-md backdrop-blur-sm relative flex items-center justify-center"
       style={{ 
+        width: size,
+        height: size,
+        borderRadius: '50%',
         backgroundColor: data.color || '#ffffff',
         color: data.textColor || '#374151',
-        border: 'none'
+        border: 'none',
+        opacity: 0.8
       }}
     >
       <Handle
         type="target"
         position={Position.Left}
         className="w-3 h-3 !bg-gray-400"
+        style={{ left: -6 }}
       />
-      <div className="font-medium text-sm">{data.label}</div>
-      {data.category && (
-        <div className="text-xs opacity-70 mt-1">{data.category}</div>
-      )}
+      <div className="text-center">
+        <div className="font-medium text-xs leading-tight">{data.label}</div>
+      </div>
       <Handle
         type="source"
         position={Position.Right}
         className="w-3 h-3 !bg-gray-400"
+        style={{ right: -6 }}
       />
     </div>
   );
@@ -116,6 +124,13 @@ export default function KnowledgeGraphPage() {
           const centralityFactor = maxDegree > 0 ? degree / maxDegree : 0;
           const baseRadius = 150 + (1 - centralityFactor) * 200; // High degree = smaller radius
           
+          // Calculate node size based on degree (more connections = bigger circle)
+          const minSize = 40;
+          const maxSize = 100;
+          const nodeSize = maxDegree > 0 
+            ? minSize + (degree / maxDegree) * (maxSize - minSize)
+            : minSize;
+          
           // Add randomization
           const angle = Math.random() * 2 * Math.PI;
           const radiusVariation = (Math.random() - 0.5) * 100;
@@ -133,7 +148,8 @@ export default function KnowledgeGraphPage() {
               color: getNodeColor(topic),
               textColor: '#374151',
               category: `Topic (${degree} connections)`,
-              originalColor: getNodeColor(topic)
+              originalColor: getNodeColor(topic),
+              size: nodeSize
             }
           };
         });
@@ -225,20 +241,14 @@ export default function KnowledgeGraphPage() {
       }
     });
     
-    // Update nodes with highlighting
+    // Update nodes with highlighting (keep original colors, only change opacity)
     setNodes(currentNodes => 
       currentNodes.map(n => ({
         ...n,
         data: {
           ...n.data,
-          color: n.id === node.id 
-            ? '#3B82F6' // Blue for selected node
-            : connectedNodeIds.has(n.id)
-            ? '#10B981' // Green for connected nodes
-            : n.data.originalColor, // Dim unconnected nodes
-          textColor: n.id === node.id || connectedNodeIds.has(n.id) 
-            ? '#FFFFFF' 
-            : '#9CA3AF'
+          color: n.data.originalColor, // Keep original colors
+          textColor: '#374151' // Keep original text color
         },
         style: {
           opacity: n.id === node.id || connectedNodeIds.has(n.id) ? 1 : 0.3
