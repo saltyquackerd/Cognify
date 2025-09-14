@@ -17,71 +17,47 @@ import ReactFlow, {
   Panel,
   Handle,
   Position,
+  ReactFlowInstance,
 } from 'reactflow';
 import { API_URLS } from '../../lib/api';
 
-// Custom node component
+// Simple rectangle node component - Clean rectangles with no borders
 const CustomNode = ({ data }: { data: { label: string; color?: string; textColor?: string; size?: number; gradient?: string } }) => {
   // Calculate dynamic size based on text content
   const text = data.label || '';
   const words = text.split(' ');
   const maxWordLength = Math.max(...words.map((word: string) => word.length));
   
-  // More generous text width calculation to prevent cutting
-  const maxTextWidth = 80; // Increased maximum width
-  const textWidth = Math.min(maxTextWidth, Math.max(50, maxWordLength * 8)); // Increased multiplier
-  
-  // More conservative line estimation to ensure no cutting
-  const avgCharsPerLine = Math.floor(textWidth / 5.5); // More conservative char estimate
-  const estimatedLines = Math.max(1, Math.ceil(text.length / avgCharsPerLine));
-  const lineHeight = 18; // Increased line height for better spacing
-  const textHeight = estimatedLines * lineHeight;
-  
-  // More generous padding to ensure no cutting
-  const minSize = Math.max(textWidth, textHeight) + 24; // Increased padding
-  const size = Math.max(70, minSize); // Increased minimum size
+  // Calculate optimal rectangle size - smaller and neater
+  const width = Math.max(60, Math.min(100, maxWordLength * 8 + 20));
+  const height = 40;
   
   return (
     <div 
-      className="relative flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group"
+      className="relative flex items-center justify-center transition-all duration-200 hover:scale-105 cursor-pointer"
       style={{ 
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        background: data.gradient || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: data.textColor || '#ffffff',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        boxShadow: `
-          0 8px 32px rgba(0, 0, 0, 0.1),
-          0 2px 8px rgba(0, 0, 0, 0.05),
-          inset 0 1px 0 rgba(255, 255, 255, 0.3),
-          inset 0 -1px 0 rgba(0, 0, 0, 0.1)
-        `,
+        width: width,
+        height: height,
+        borderRadius: '8px',
+        background: data.gradient || 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+        color: data.textColor || '#3730a3',
+        border: 'none',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
         position: 'relative',
         overflow: 'hidden'
       }}
     >
-      {/* Animated background overlay */}
-      <div 
-        className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300"
-        style={{
-          background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%)'
-        }}
-      />
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3 h-3 !bg-gray-400"
-        style={{ left: -6 }}
+        className="w-2 h-2 !bg-gray-400"
+        style={{ left: -4 }}
       />
+      
       <div 
-        className="text-center px-4 relative z-10"
+        className="text-center px-2"
         style={{ 
-          maxWidth: `${textWidth}px`,
-          width: `${textWidth}px`,
-          minHeight: `${textHeight}px`,
+          maxWidth: `${width - 12}px`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -89,15 +65,16 @@ const CustomNode = ({ data }: { data: { label: string; color?: string; textColor
           overflowWrap: 'break-word'
         }}
       >
-        <div className="font-semibold text-xs leading-relaxed break-words whitespace-normal tracking-wide drop-shadow-sm hyphens-auto">
+        <div className="font-medium text-xs leading-tight break-words whitespace-normal">
           {data.label}
         </div>
       </div>
+      
       <Handle
         type="source"
         position={Position.Right}
-        className="w-3 h-3 !bg-gray-400"
-        style={{ right: -6 }}
+        className="w-2 h-2 !bg-gray-400"
+        style={{ right: -4 }}
       />
     </div>
   );
@@ -113,7 +90,7 @@ const defaultNodeTypes = {
   customNode: CustomNode,
 };
 
-// Tame, cohesive color palette with muted tones
+// Elegant pastel color palette with perfect circles
 const getNodeColor = (topic: string): { gradient: string; textColor: string } => {
   const colorSchemes = [
     { gradient: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)', textColor: '#3730a3' },
@@ -124,13 +101,16 @@ const getNodeColor = (topic: string): { gradient: string; textColor: string } =>
     { gradient: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)', textColor: '#831843' },
     { gradient: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', textColor: '#334155' },
     { gradient: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)', textColor: '#581c87' },
+    { gradient: 'linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)', textColor: '#064e3b' },
+    { gradient: 'linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%)', textColor: '#581c87' }
   ];
   
-  // Simple hash function to consistently assign colors
-  let hash = 0;
-  for (let i = 0; i < topic.length; i++) {
-    hash = topic.charCodeAt(i) + ((hash << 5) - hash);
-  }
+  // Use topic name to consistently assign colors
+  const hash = topic.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
   return colorSchemes[Math.abs(hash) % colorSchemes.length];
 };
 
@@ -140,7 +120,7 @@ export default function KnowledgeGraphPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [mounted, setMounted] = useState(false);
-  const reactFlowRef = useRef<any>(null);
+  const reactFlowRef = useRef<ReactFlowInstance | null>(null);
 
   // Ensure component is mounted on client side
   useEffect(() => {
@@ -187,11 +167,14 @@ export default function KnowledgeGraphPage() {
         
         // Transform API data to React Flow format
         // Backend returns: { topics: [...], edges: [[source, target], ...] }
-        const topics = data.topics || [];
-        const edgeList = data.edges || [];
+        const topics = data.topics || ['Test Node 1', 'Test Node 2', 'Test Node 3'];
+        const edgeList = data.edges || [['Test Node 1', 'Test Node 2'], ['Test Node 2', 'Test Node 3']];
+        
         
         console.log('Processed topics:', topics);
         console.log('Processed edges:', edgeList);
+        console.log('Topics length:', topics.length);
+        console.log('EdgeList length:', edgeList.length);
         
         // Calculate node degrees (number of connections)
         const nodeDegrees = new Map<string, number>();
@@ -202,7 +185,9 @@ export default function KnowledgeGraphPage() {
         });
 
         // Create nodes with web-like positioning using force simulation
-        const transformedNodes = topics.map((topic: string) => {
+        console.log('Creating nodes for topics:', topics);
+        const transformedNodes = topics.map((topic: string, index: number) => {
+          console.log(`Creating node ${index}: ${topic}`);
           const degree = nodeDegrees.get(topic) || 0;
           const maxDegree = Math.max(...Array.from(nodeDegrees.values()));
           
@@ -256,6 +241,10 @@ export default function KnowledgeGraphPage() {
           };
         });
         
+        console.log('All nodes created:', transformedNodes.length);
+        console.log('Node IDs:', transformedNodes.map((n: Node) => n.id));
+        
+        
         // Create edges from edge list with web-like styling
         const transformedEdges = edgeList.map((edge: [string, string], index: number) => {
           const sourceDegree = nodeDegrees.get(edge[0]) || 0;
@@ -265,7 +254,7 @@ export default function KnowledgeGraphPage() {
           // Use consistent edge styling for better visibility
           const strokeWidth = Math.max(1.5, Math.min(3, 1.5 + edgeStrength * 0.2));
           
-          // Use straight lines for clean appearance
+          // Use simple straight lines
           const edgeType = 'straight';
           
           return {
@@ -275,18 +264,28 @@ export default function KnowledgeGraphPage() {
             type: edgeType,
             animated: false,
             style: {
-              stroke: '#9ca3af',
-              strokeWidth: strokeWidth,
-              opacity: 0.8
-            },
-            labelStyle: { fill: '#6B7280', fontWeight: 500 }
+              stroke: '#6b7280',
+              strokeWidth: 2,
+              opacity: 0.7
+            }
           };
         });
         
         console.log('Setting nodes:', transformedNodes);
         console.log('Setting edges:', transformedEdges);
+        console.log('Transformed nodes length:', transformedNodes.length);
+        console.log('Transformed edges length:', transformedEdges.length);
         setNodes(transformedNodes);
         setEdges(transformedEdges);
+        
+        // Force fit view after a short delay to ensure React Flow is ready
+        setTimeout(() => {
+          if (reactFlowRef.current && typeof reactFlowRef.current.fitView === 'function') {
+            reactFlowRef.current.fitView({ padding: 0.1 });
+            console.log('Fit view called');
+          }
+        }, 100);
+        
         
       } catch (error) {
         console.error('Error loading knowledge graph:', error);
@@ -296,9 +295,9 @@ export default function KnowledgeGraphPage() {
           {
             id: 'ai',
             type: 'default',
-            position: { x: 400, y: 200 },
+            position: { x: 300, y: 200 },
             data: { 
-              label: 'Artificial Intelligence', 
+              label: 'AI', 
               gradient: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
               textColor: '#3730a3',
               category: 'Core Concept',
@@ -309,9 +308,9 @@ export default function KnowledgeGraphPage() {
           {
             id: 'ml',
             type: 'default',
-            position: { x: 200, y: 300 },
+            position: { x: 500, y: 200 },
             data: { 
-              label: 'Machine Learning', 
+              label: 'ML', 
               gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
               textColor: '#14532d',
               category: 'Technology',
@@ -328,7 +327,12 @@ export default function KnowledgeGraphPage() {
             target: 'ml', 
             label: 'includes',
             type: 'straight',
-            style: { stroke: '#9ca3af', strokeWidth: 1.5, opacity: 0.8 }
+            animated: false,
+            style: { 
+              stroke: '#6b7280', 
+              strokeWidth: 2, 
+              opacity: 0.7
+            }
           }
         ];
         
@@ -336,6 +340,14 @@ export default function KnowledgeGraphPage() {
         console.log('Using fallback data - edges:', fallbackEdges);
         setNodes(fallbackNodes);
         setEdges(fallbackEdges);
+        
+        // Force fit view for fallback data too
+        setTimeout(() => {
+          if (reactFlowRef.current && typeof reactFlowRef.current.fitView === 'function') {
+            reactFlowRef.current.fitView({ padding: 0.1 });
+            console.log('Fit view called for fallback data');
+          }
+        }, 100);
       }
     };
     
@@ -346,6 +358,7 @@ export default function KnowledgeGraphPage() {
   useEffect(() => {
     console.log('Nodes changed:', nodes);
     console.log('Edges changed:', edges);
+    console.log('React Flow should render with', nodes.length, 'nodes and', edges.length, 'edges');
   }, [nodes, edges]);
 
   // Handle connection between nodes
@@ -435,6 +448,11 @@ export default function KnowledgeGraphPage() {
     );
   }, [setNodes, setEdges]);
 
+  // Initialize React Flow instance
+  const onInit = useCallback((reactFlowInstance: ReactFlowInstance) => {
+    reactFlowRef.current = reactFlowInstance;
+  }, []);
+
   // Handle adding new nodes
   const onAddNode = useCallback(() => {
     const colorScheme = getNodeColor('New Concept');
@@ -456,30 +474,52 @@ export default function KnowledgeGraphPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Modern Header */}
-      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50">
+      <style jsx global>{`
+        .react-flow__node {
+          border: none !important;
+          outline: none !important;
+        }
+        .react-flow__node-default {
+          border: none !important;
+          outline: none !important;
+        }
+        .react-flow__node-customNode {
+          border: none !important;
+          outline: none !important;
+        }
+        .react-flow__node-rect {
+          border: none !important;
+          outline: none !important;
+        }
+        .react-flow__node input {
+          border: none !important;
+          outline: none !important;
+        }
+      `}</style>
+      {/* Simple Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.back()}
-              className="p-3 hover:bg-gray-100/80 rounded-xl transition-all duration-200 hover:scale-105 group"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <svg className="w-5 h-5 text-gray-600 group-hover:text-gray-900 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-semibold text-gray-800">
                 Knowledge Graph
               </h1>
-              <p className="text-sm text-gray-500 font-medium">Interactive concept visualization</p>
+              <p className="text-sm text-gray-500">Interactive concept visualization</p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
             <button 
               onClick={onAddNode}
-              className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-xl"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
               Add Node
             </button>
@@ -490,18 +530,12 @@ export default function KnowledgeGraphPage() {
       {/* Main Content - Full Width */}
       <div className="h-[calc(100vh-80px)]">
         {/* React Flow Area */}
-        <div className="h-full relative">
-          {/* Web-like background pattern */}
+        <div className="h-full relative" style={{ minHeight: '600px' }}>
+          {/* Simple clean background */}
           <div 
             className="absolute inset-0 pointer-events-none opacity-20"
             style={{
-              backgroundImage: `
-                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 60%, rgba(139, 92, 246, 0.1) 0%, transparent 50%)
-              `,
-              backgroundSize: '200px 200px, 300px 300px, 250px 250px',
-              backgroundPosition: '0 0, 100px 100px, 50px 150px'
+              background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.5) 0%, rgba(255, 255, 255, 0.3) 100%)'
             }}
           />
           
@@ -540,11 +574,7 @@ export default function KnowledgeGraphPage() {
           )}
           {mounted && (
             <div>
-              <div style={{ position: 'absolute', top: 10, left: 10, background: 'red', color: 'white', padding: '5px', zIndex: 1000 }}>
-                React Flow is mounted and should be interactive! Nodes: {nodes.length}, Edges: {edges.length}
-              </div>
               <ReactFlow
-                ref={reactFlowRef}
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
@@ -552,10 +582,12 @@ export default function KnowledgeGraphPage() {
                 onConnect={onConnect}
                 onNodeClick={onNodeClick}
                 onPaneClick={onPaneClick}
+                onInit={onInit}
                 nodeTypes={defaultNodeTypes}
                 fitView
-                className="bg-gradient-to-br from-gray-50 to-gray-100"
-                style={{ width: '100%', height: '100%' }}
+                className="bg-white"
+                style={{ width: '100%', height: '100%', minHeight: '500px' }}
+                defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               >
             <Controls className="bg-white/80 backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-lg" />
             <MiniMap 
