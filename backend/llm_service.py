@@ -61,7 +61,6 @@ class LLM():
         if conversation_history:
             messages.extend(conversation_history)
         messages.append({"role": "user", "content": message})
-        print(messages)
         try:
             response = self.cerebras_client.chat.completions.create(
                 messages=messages,
