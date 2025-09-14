@@ -43,23 +43,27 @@ class SessionSchema:
         return all(field in data for field in required_fields)
 
 class MessageSchema:
-    """Message schema based on app.py data structure"""
+    """Message schema with message_id, message, timestamp, role"""
     
     @staticmethod
-    def create_message_document(message_id: str, user_message: str, chat_response: str) -> Dict:
-        """Create a new message document matching app.py structure"""
+    def create_message_document(message: str, role: str) -> Dict:
+        """Create a single message document"""
         return {
-            'id': message_id,
-            'user_message': user_message,
-            'chat_response': chat_response,
-            'timestamp': datetime.now().isoformat()
+            'message_id': str(uuid.uuid4()),
+            'message': message,
+            'timestamp': datetime.now().isoformat(),
+            'role': role
         }
     
     @staticmethod
     def validate_message_data(data: Dict) -> bool:
         """Validate message data structure"""
-        required_fields = ['user_message', 'chat_response']
-        return all(field in data for field in required_fields)
+        required_fields = ['message', 'role']
+        valid_roles = ['user', 'assistant']
+        return (
+            all(field in data for field in required_fields) and
+            data.get('role') in valid_roles
+        )
 
 class QuizSchema:
     """Quiz schema based on app.py data structure"""

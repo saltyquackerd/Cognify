@@ -121,31 +121,35 @@ def chat():
             return jsonify({'error': 'Session not found'}), 404
         
         session = sessions[session_id]
+
+        # Add user message to conversation history
+        session['conversation_history'].append({"role": "user", "content": user_message})
+        # Store the user message
+        user_message_doc = MessageSchema.create_message_document(user_message, 'user')
+        session['messages'].append(user_message_doc)
         
         # Get response from Cerebras with conversation context
         chat_response = llm_service.get_chat_response(user_message, session['conversation_history'])
         
-        # Add user message and AI response to conversation history
-        session['conversation_history'].append({"role": "user", "content": user_message})
+        # Add AI response to conversation history
         session['conversation_history'].append({"role": "assistant", "content": chat_response})
+        # Store the chatbot response
+        chatbot_message_doc = MessageSchema.create_message_document(chat_response, 'assistant')
+        session['messages'].append(chatbot_message_doc)
         
         # Set title after first user question if title is still empty
         if not session['title']:
             summary = f"User message: {user_message}\nChat response: {chat_response}"
             session['title'] = llm_service.get_title(summary)
         
-        # Store the conversation
-        message_id = str(uuid.uuid4())
-        session['messages'].append({
-            'id': message_id,
-            'user_message': user_message,
-            'chat_response': chat_response,
-            'timestamp': datetime.now().isoformat()
-        })
+        # Get the message IDs for the response
+        user_message_id = user_message_doc['message_id']
+        chatbot_message_id = chatbot_message_doc['message_id']
         
         return jsonify({
             'session_id': session_id,
-            'message_id': message_id,
+            'user_message_id': user_message_id,
+            'chatbot_message_id': chatbot_message_id,
             'chat_response': chat_response,
             'user_id': session['user_id'],
             'title': session['title']
@@ -168,26 +172,37 @@ def create_quiz_thread():
         if session_id not in sessions:
             return jsonify({'error': 'Session not found'}), 404
         
-        # Find the specific message (search from bottom for recent messages)
-        target_message = None
+        # Find the specific assistant message (search from bottom for recent messages)
+        target_assistant_message = None
+        target_user_message = None
         messages = sessions[session_id]['messages']
+        
+        # Find the assistant message by ID
         for i in range(len(messages) - 1, -1, -1):
-            if messages[i]['id'] == message_id:
-                target_message = messages[i]
+            if messages[i]['message_id'] == message_id and messages[i]['role'] == 'assistant':
+                target_assistant_message = messages[i]
+                # Find the corresponding user message (search backwards from this assistant message)
+                for j in range(i - 1, -1, -1):
+                    if messages[j]['role'] == 'user':
+                        target_user_message = messages[j]
+                        break
                 break
         
-        if not target_message:
-            return jsonify({'error': 'Message not found'}), 404
+        if not target_assistant_message:
+            return jsonify({'error': 'Assistant message not found'}), 404
+        
+        if not target_user_message:
+            return jsonify({'error': 'Corresponding user message not found'}), 404
         
         # Generate quiz questions from the specific response
-        quiz_questions_text = llm_service.generate_quiz_questions(target_message['chat_response'])
+        quiz_questions_text = llm_service.generate_quiz_questions(target_assistant_message['message'])
         
         # Create a single question structure from the generated text
         quiz_questions = [{
             'id': str(uuid.uuid4()),
             'type': 'long_answer',
             'question': quiz_questions_text,
-            'source_text': target_message['chat_response']
+            'source_text': target_assistant_message['message']
         }]
         
         # Create quiz thread
@@ -202,8 +217,8 @@ def create_quiz_thread():
             'completed': False,
             'created_at': datetime.now().isoformat(),
             'conversation_history': [
-                {"role": "user", "content": target_message['user_message']},
-                {"role": "assistant", "content": target_message['chat_response']},
+                {"role": "user", "content": target_user_message['message']},
+                {"role": "assistant", "content": target_assistant_message['message']},
                 {"role": "assistant", "content": f"Quiz Questions:\n" + "\n".join([f"Q{i+1}: {q['question']}" for i, q in enumerate(quiz_questions)])}
             ]  # Track complete quiz thread conversation in LLM-ready format
         }
@@ -214,7 +229,7 @@ def create_quiz_thread():
             'quiz_id': quiz_id,
             'message_id': message_id,
             'quiz_questions': quiz_questions,
-            'source_response': target_message['chat_response']
+            'source_response': target_assistant_message['message']
         })
         
     except Exception as e:
