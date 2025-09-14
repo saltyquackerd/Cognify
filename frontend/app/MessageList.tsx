@@ -112,7 +112,23 @@ export default function MessageList() {
       {/* Header with Logo/Brand */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {!isCollapsed && <span className="text-lg font-cognify text-gray-900">Cognify</span>}
+          {!isCollapsed && (
+            <button
+              onClick={() => {
+                // Clear the selected conversation by setting it to null
+                useStore.setState({ 
+                  selectedConversationId: null,
+                  conversations: useStore.getState().conversations.map(conv => ({
+                    ...conv,
+                    isActive: false
+                  }))
+                });
+              }}
+              className="text-lg font-cognify text-gray-900 hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              Cognify
+            </button>
+          )}
         </div>
         
         <button
