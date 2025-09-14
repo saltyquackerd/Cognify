@@ -28,7 +28,8 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     updateConversationLastMessage,
     createOrSelectEmptyConversation,
     conversations,
-    getQuizForMessage
+    getQuizForMessage,
+    createQuizForMessage
   } = useStore();
   
   const activeConversation = useMemo(() => {
@@ -225,8 +226,32 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     }
   };
 
-  const handleOpenSidePopup = (message: Message) => {
+  const handleOpenSidePopup = async (message: Message) => {
     console.log('Opening side popup with message:', message);
+    console.log('Current quiz status for message:', getQuizForMessage(message.id));
+    console.log('Selected conversation ID:', selectedConversationId);
+    
+    // Automatically create quiz if one doesn't exist
+    if (!getQuizForMessage(message.id) && selectedConversationId) {
+      try {
+        console.log('Auto-creating quiz for message:', message.id);
+        const quizConv = await createQuizForMessage({
+          id: message.id,
+          content: message.content,
+          role: message.role,
+          timestamp: message.timestamp,
+          conversationId: selectedConversationId
+        }, '1');
+        console.log('Quiz created successfully:', quizConv);
+      } catch (error) {
+        console.error('Failed to auto-create quiz:', error);
+        return; // Don't open popup if quiz creation failed
+      }
+    } else {
+      console.log('Quiz already exists or no conversation ID');
+    }
+    
+    // Now open the side popup after quiz is created
     setPopupMessage(message.content);
     setSelectedMessageId(message.id);
     setSidePopupOpen(true);
@@ -303,22 +328,15 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                         </p>
                       </div>
                       
-                      {/* Side Popup Trigger Button - Only for assistant messages */}
+                      {/* Quiz Button - Only for assistant messages */}
                       {message.role === 'assistant' && (
                         <div className="flex items-center space-x-1 self-end mt-1">
-                          {getQuizForMessage(message.id) && (
-                            <div className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
-                              Quiz
-                            </div>
-                          )}
                           <button
                             onClick={() => handleOpenSidePopup(message)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600"
-                            title="Continue this conversation in side panel"
+                            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-full border border-gray-300 hover:border-gray-400 transition-all duration-200"
+                            title="Quiz me on this message"
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                              <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            Quiz me
                           </button>
                         </div>
                       )}

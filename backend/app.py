@@ -586,5 +586,48 @@ def get_conversation_messages_endpoint(conv_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def get_quiz_messages(quiz_id):
+    """Get all messages for a specific quiz"""
+    try:
+        if quiz_id not in quizzes:
+            return []
+            
+        quiz_data = quizzes[quiz_id]
+        messages = []
+        
+        # Get messages from the quiz's messages array
+        if quiz_data.get('messages') and len(quiz_data['messages']) > 0:
+            for msg in quiz_data['messages']:
+                # Each message is already a single message with the new structure
+                messages.append({
+                    'id': msg['message_id'],
+                    'content': msg['message'],
+                    'role': msg['role'],
+                    'timestamp': msg['timestamp'],
+                    'quizId': quiz_id
+                })
+        
+        # Sort messages by timestamp
+        messages.sort(key=lambda x: x['timestamp'])
+        
+        return messages
+        
+    except Exception as e:
+        print(f"Error getting quiz messages for {quiz_id}: {e}")
+        return []
+
+@app.route('/api/quiz/<quiz_id>/messages', methods=['GET'])
+def get_quiz_messages_endpoint(quiz_id):
+    """Get all messages for a specific quiz"""
+    try:
+        if quiz_id not in quizzes:
+            return jsonify({'error': 'Quiz not found'}), 404
+            
+        messages = get_quiz_messages(quiz_id)
+        return jsonify(messages)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

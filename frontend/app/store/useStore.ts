@@ -231,7 +231,10 @@ export const useStore = create<StoreState>((set, get) => ({
 
   getQuizForMessage: (messageId) => {
     const { messageQuizMap } = get();
-    return messageQuizMap[messageId] || null;
+    const result = messageQuizMap[messageId] || null;
+    console.log('Store: getQuizForMessage for', messageId, '=', result);
+    console.log('Store: Current messageQuizMap:', messageQuizMap);
+    return result;
   },
 
   openOrCreateQuizForMessage: async (message, userId, selectQuiz = false) => {
@@ -285,6 +288,7 @@ export const useStore = create<StoreState>((set, get) => ({
   createQuizForMessage: async (message, userId) => {
     // Create quiz thread using the new non-streaming endpoint
     try {
+      console.log('Store: Creating quiz for message:', message.id);
       const response = await fetch(`http://localhost:5000/api/sessions/${message.conversationId}/quiz/start`, {
         method: 'POST',
         headers: {
@@ -300,6 +304,7 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       
       const quizData = await response.json();
+      console.log('Store: Quiz data received:', quizData);
       
       // Create quiz conversation (not added to main conversations)
       const threadConversation: Conversation = {
@@ -311,13 +316,18 @@ export const useStore = create<StoreState>((set, get) => ({
       };
       
       // Store quiz mapping only (messages managed by popup)
-      set((state) => ({
-        messageQuizMap: {
+      set((state) => {
+        const newMessageQuizMap = {
           ...state.messageQuizMap,
           [message.id]: threadConversation.id
-        }
-      }));
+        };
+        console.log('Store: Updated messageQuizMap:', newMessageQuizMap);
+        return {
+          messageQuizMap: newMessageQuizMap
+        };
+      });
       
+      console.log('Store: Quiz created successfully:', threadConversation);
       return threadConversation;
     } catch (error) {
       console.error('Error creating quiz thread:', error);
