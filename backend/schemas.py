@@ -72,32 +72,22 @@ class MessageSchema:
         )
 
 class QuizSchema:
-    """Quiz schema based on app.py data structure"""
+    """Quiz schema matching session structure"""
     
     @staticmethod
     def create_quiz_document(
         quiz_id: str, 
         session_id: str, 
-        user_id: str, 
-        message_id: str, 
-        quiz_questions: List[Dict],
-        target_message: Dict
+        user_id: str
     ) -> Dict:
-        """Create a new quiz document matching app.py structure"""
+        """Create a new quiz document matching session structure"""
         return {
             '_id': quiz_id,
             'session_id': session_id,
             'user_id': user_id,
-            'message_id': message_id,
-            'questions': quiz_questions,
-            'current_question_index': 0,
-            'completed': False,
             'created_at': datetime.now().isoformat(),
-            'conversation_history': [
-                {"role": "user", "content": target_message['user_message']},
-                {"role": "assistant", "content": target_message['chat_response']},
-                {"role": "assistant", "content": f"Quiz Questions:\n" + "\n".join([f"Q{i+1}: {q['question']}" for i, q in enumerate(quiz_questions)])}
-            ]
+            'messages': [],
+            'conversation_history': []
         }
     
     @staticmethod
