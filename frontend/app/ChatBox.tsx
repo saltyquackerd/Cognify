@@ -327,9 +327,30 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
               {/* Generate Tags Button */}
               {activeConversation && (
                 <button
-                  onClick={() => {
-                    // TODO: Implement tag generation functionality
-                    console.log('Generate tags for conversation:', activeConversation.id);
+                  onClick={async () => {
+                    if (!activeConversation) return;
+                    
+                    try {
+                      const response = await fetch(`http://localhost:5000/api/sessions/${activeConversation.id}/tags`, {
+                        method: 'GET',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                      });
+
+                      if (!response.ok) {
+                        throw new Error('Failed to generate tags');
+                      }
+
+                      const tags = await response.json();
+                      console.log('Generated tags for conversation:', activeConversation.id, tags);
+                      
+                      // TODO: Display tags in UI or store them in state
+                      // For now, just log them to console
+                    } catch (error) {
+                      console.error('Error generating tags:', error);
+                      // TODO: Show error message to user
+                    }
                   }}
                   className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200 flex items-center space-x-1"
                   title="Generate tags for this conversation"

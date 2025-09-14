@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from llm_service import LLM
 from database import DatabaseService
 from schemas import MessageSchema
+from graph_service import GraphServices
 
 # Load environment variables
 load_dotenv()
@@ -17,6 +18,7 @@ CORS(app)
 
 # Initialize services
 llm_service = LLM()
+graph_service = GraphServices()
 try:
     db_service = DatabaseService()
 except Exception as e:
@@ -29,6 +31,7 @@ except Exception as e:
 users = {}  # user_id -> user_data
 sessions = {}  # session_id -> session_data  
 quizzes = {}  # quiz_id -> quizzes
+tags = set()  # all tags
 
 # Add test data
 def initialize_test_data():
@@ -655,6 +658,66 @@ def conversation_history_to_string(session_id):
     except Exception as e:
         print(f"Error converting conversation history to string for session {session_id}: {e}")
         return ""
+
+@app.route('/api/sessions/<session_id>/tags', methods=['GET'])
+def get_session_tags(session_id):
+    """Get tags for a session using conversation history"""
+    try:
+        if session_id not in sessions:
+            return jsonify({'error': 'Session not found'}), 404
+        
+        session = sessions[session_id]
+        
+        # Get conversation history directly from session data
+        conversation_history = session.get('conversation_history', [])
+        
+        if not conversation_history:
+            return jsonify({'tags': []})
+        
+        # Get tags using graph service
+        session_tags = graph_service.get_tags(conversation_history)
+        
+        # Update the session's tags field
+        sessions[session_id]['tags'] = session_tags
+        
+        # Add tags to global tags set
+        for tag in session_tags:
+            tags.add(tag)
+        
+        return jsonify({'tags': session_tags})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/knowledge-graph', methods=['GET'])
+def get_knowledge_graph():
+    """Get knowledge graph using all global tags"""
+    try:
+        # Convert global tags set to list
+        global_tags_list = list(tags)
+        
+        if not global_tags_list:
+            return jsonify({'topics': [], 'edges': []})
+        
+        # Get knowledge graph using graph service
+        adjacency = graph_service.get_knowledge_graph(global_tags_list)
+        
+        # Convert adjacency list to list of edges
+        edges = []
+        for source, targets in adjacency.items():
+            for target in targets:
+                # Avoid duplicate edges (since graph is undirected)
+                edge = sorted([source, target])
+                if edge not in edges:
+                    edges.append(edge)
+        
+        return jsonify({
+            'topics': global_tags_list,
+            'edges': edges
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
