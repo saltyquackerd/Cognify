@@ -323,13 +323,23 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                   {activeConversation ? activeConversation.title : 'Cognify'}
                 </h1>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-500">
-                Conversation ID
-              </div>
-              <div className="text-sm font-mono text-gray-700">
-                {selectedConversationId || 'None'}
-              </div>
+            <div className="flex items-center">
+              {/* Generate Tags Button */}
+              {activeConversation && (
+                <button
+                  onClick={() => {
+                    // TODO: Implement tag generation functionality
+                    console.log('Generate tags for conversation:', activeConversation.id);
+                  }}
+                  className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200 flex items-center space-x-1"
+                  title="Generate tags for this conversation"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <span>Generate Tags</span>
+                </button>
+              )}
             </div>
           </div>
           </div>
