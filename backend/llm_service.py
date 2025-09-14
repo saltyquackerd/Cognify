@@ -43,7 +43,7 @@ class LLM():
 
         elif model_type == 'claude' or model_type == 'anthropic':
             if not self.anthropic_client.api_key:
-                yield "Error: CEREBRAS_API_KEY not configured"
+                yield "Error: CLAUDE_API_KEY not configured"
             
             model = model or self.default_anthropic_model
         
