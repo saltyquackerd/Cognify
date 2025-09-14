@@ -115,7 +115,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       <div className="fixed inset-0 z-50 bg-white flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg text-gray-900">
             {title} - Fullscreen
           </h2>
           <div className="flex items-center space-x-2">

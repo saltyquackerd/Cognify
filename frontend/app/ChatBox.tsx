@@ -226,7 +226,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           isOpen={true}
           onClose={handleCloseSidePopup}
           initialMessage={popupMessage}
-          title="Continue Chat"
+          title="Check Your Recall"
           onWidthChange={setCurrentSidePopupWidth}
         />
       )}
