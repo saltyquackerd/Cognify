@@ -21,7 +21,7 @@ import ReactFlow, {
 import { API_URLS } from '../../lib/api';
 
 // Custom node component
-const CustomNode = ({ data }: { data: { label: string; color?: string; textColor?: string; size?: number } }) => {
+const CustomNode = ({ data }: { data: { label: string; color?: string; textColor?: string; size?: number; gradient?: string } }) => {
   // Calculate dynamic size based on text content
   const text = data.label || '';
   const words = text.split(' ');
