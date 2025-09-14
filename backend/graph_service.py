@@ -27,6 +27,7 @@ class GraphServices():
                 - Include broad topics (e.g. "Computer Science") and narrow ones (e.g. "Dijkstra").
                 - Generate around 3-5 key topics.
                 - Do not include duplicates.
+                - Do not use unrelevant terms like "user", "assistant", or "conversation history" as topics.
                 - Output JSON ONLY, no commentary.
                 """
         final_response = self.llm.get_chat_response(prompt, conversation_history = chat_history)
@@ -50,7 +51,7 @@ class GraphServices():
     def get_knowledge_graph(self, topics): # outputs all edges in adjacency matrix in json
         adj_list = defaultdict(list)
         system_prompt = f"""You are an information extractor.
-                    Return ONLY valid JSON (no prose). Build an undirected adjacency LIST for topic relatedness.
+                    Return ONLY valid JSON (no prose). Build an undirected adjacency LIST to show which topics are related to each other.
                     topics = {topics}
                     Rules:
                     - Use the `topics` array EXACTLY AS GIVEN and IN THE SAME ORDER.

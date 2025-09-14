@@ -3,48 +3,73 @@ import os
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from cerebras.cloud.sdk import Cerebras
+import anthropic
 
 # Load environment variables from .env file
 load_dotenv()
 
 class LLM():
-    """Handles all LLM-related operations using Cerebras API"""
+    """Handles all LLM-related operations using Cerebras API and Claude API"""
     
     def __init__(self):
         self.default_cerebras_model = "llama-4-scout-17b-16e-instruct"
         self.cerebras_client = Cerebras(
             api_key=os.environ.get("CEREBRAS_API_KEY")
         )
+        self.claude_client = anthropic.Anthropic(
+            api_key=os.environ.get("CLAUDE_API_KEY")
+        )
+        self.default_claude_model = "claude-3-7-sonnet-20250219"
         self.max_tokens=1000
     
     def stream_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, system_prompt: str = None):
         """
-        Stream response chunks from Cerebras API.
+        Stream response chunks from Claude API.
         Yields text chunks as they arrive.
         """
-        if not self.cerebras_client.api_key:
-            yield "Error: CEREBRAS_API_KEY not configured"
+        if not self.claude_client.api_key:
+            yield "Error: CLAUDE_API_KEY not configured"
             return
         
-        model = model or self.default_cerebras_model
+        model = model or self.default_claude_model
+        
+        def to_blocks(content):
+            """Convert content to blocks format"""
+            if isinstance(content, list):
+                return content
+            if isinstance(content, str):
+                return [{"type": "text", "text": content}]
+            return [{"type": "text", "text": str(content or "")}]
+
+        # Convert conversation history to Claude format
         messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
         if conversation_history:
-            messages.extend(conversation_history)
-        messages.append({"role": "user", "content": message})
-        print(messages)
+            # Filter out system messages since Claude doesn't support role: "system" in messages
+            for msg in conversation_history:
+                if msg.get("role") != "system":
+                    messages.append({
+                        "role": msg["role"], 
+                        "content": to_blocks(msg["content"])
+                    })
+        messages.append({"role": "user", "content": to_blocks(message)})
+        
         try:
-            stream = self.cerebras_client.chat.completions.create(
-                messages=messages,
-                model=model,
-                stream=True
-            )
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-        except requests.exceptions.RequestException as e:
-            yield f"Error communicating with Cerebras API: {str(e)}"
+            # Prepare the stream parameters
+            stream_params = {
+                "model": model,
+                "max_tokens": self.max_tokens,
+                "messages": messages
+            }
+            
+            # Add system parameter if system_prompt is provided
+            if system_prompt:
+                stream_params["system"] = to_blocks(system_prompt)
+            
+            with self.claude_client.messages.stream(**stream_params) as stream:
+                for text in stream.text_stream:
+                    yield text
+        except Exception as e:
+            yield f"Error communicating with Claude API: {str(e)}"
 
     def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, system_prompt: str = None) -> str:
         """
@@ -78,28 +103,29 @@ class LLM():
         Args:
             response_text (str): Text to generate questions from
             user_highlight (str): Text highlighted by the user to get quiz question on
-            coversation_history: Conversation history for context
+            conversation_history: Conversation history for context
             
         Returns:
             List[Dict]: List containing one long-answer question
         """
 
         system_prompt = """You are a question writer.
-                        Write EXACTLY ONE brief long-answer question.
-                        If there are HIGHLIGHTS, prioritize HIGHLIGHTS appearing in CONTEXT
+                        Write EXACTLY ONE brief long-answer question about the given CONTEXT.
                         Output must be related to CONTEXT—no rationale, no preface, no JSON, no bullets.
                         Do not repeat past questions.
                         No examples. No answers. No special tokens"""
 
-        user_prompt = f"""CONTEXT:
-                        {response_text}
+        user_prompt = f"""You are a quiz question generator.
+Write ONE insightful long-answer question based on the CONTEXT below.
 
-                        HIGHLIGHTS:
-                        {user_highlight or ""}
+CONTEXT:
+{response_text}
 
-                        Requirements:
-                        - Focus on relationships, trade-offs, mechanisms, synthesis, or other questions that test mastering of knowledge from the conversation history
-                        """
+Guidelines:
+- The question should require the user to demonstrate understanding of the given CONTEXT, such as explaining relationships and ideas from the CONTEXT.
+- Do NOT repeat any previous questions.
+- Do NOT include rationale, preface, examples, answers, or special formatting—just the question itself.
+"""
         
         conversation = conversation_history or list()
 
@@ -115,12 +141,13 @@ class LLM():
                     You are an impartial grader.
                     Evaluate relative to conversation history, do not use outside knowledge.
                     Produce a concise evaluation of the USER's latest answer to the ASSISTANT's latest question.
+                    Be concise and to the point. Limit your evaluation to less than 200 words.
                     Prefer evidence quotes from the history rather than long explanations.
                     Address the student directly using 'you' instead of 'user'.
                     Highlight what the user did well and praise it.  
                     Point out any missing or incorrect elements, and briefly explain them to improve understanding.  
                     Do not include numeric scores or grades.  
-                    Focus on helping the student learn.  
+                    Focus on helping the student learn.
                     """
         
         if conversation_history is None:
@@ -159,11 +186,8 @@ def main():
     # TEST 1: MESSAGE WTIH NO CONTEXT
     message = "What are some graph algorithms?"
     # message = "What is the probability of rolling two dice and getting a sum of 7?"
-    response = ""
-    gen = llm.get_chat_response(message)
-    for s in gen:
-        response += s
-        print(s,end='',flush=True)
+    response = llm.get_chat_response(message)
+    print(response, end='', flush=True)
     
     history.append({'role':'user','content':message})
     history.append({'role':'assistant','content':response})
@@ -171,12 +195,8 @@ def main():
     # TEST 2: MESSAGE WITH CONTEXT
     message = "I understand Dijkstra's, but I do not understand Bellman Ford. Why do they accept different edge weights?"
     # message = 'How about 8?'
-    response = ''
-    gen = llm.get_chat_response(message, conversation_history = history)
-    for s in gen:
-        response += s
-        print(s,end='',flush=True)
-    print()
+    response = llm.get_chat_response(message, conversation_history = history)
+    print(response)
 
     history.append({'role':'user','content':message})
     history.append({'role':'assistant','content':response})
