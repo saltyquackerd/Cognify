@@ -141,7 +141,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
             {/* Messages Container */}
             <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
             {currentMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
                 <div className="max-w-md">
                   <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
                     {selectedConversation ? `Welcome to ${selectedConversation.title}` : 'Welcome to Cognify'}
