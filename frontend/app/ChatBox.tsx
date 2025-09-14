@@ -35,6 +35,9 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   const activeConversation = useMemo(() => {
     return conversations.find(conv => conv.id === selectedConversationId) || null;
   }, [conversations, selectedConversationId]);
+
+  // Helper to check if current conversation is in strict mode
+  const isStrictMode = activeConversation?.quizMode === 'strict';
   
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
@@ -198,19 +201,31 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                   }
                   
                   // Check if this is strict mode and auto-open quiz
-                  const currentConv = useStore.getState().conversations.find(c => c.id === conversationId);
-                  if (currentConv?.quizMode === 'strict') {
-                    const assistantMessage = {
-                      id: data.chatbot_message_id,
-                      content: fullResponse,
-                      role: 'assistant' as const,
-                      timestamp: new Date(),
-                      conversationId: conversationId,
-                    };
-                    setIsQuizBlocking(true);
-                    setQuizResponseCount(0); // Reset response count for new quiz
-                    await handleOpenSidePopup(assistantMessage);
-                  }
+                  // Wait a bit to ensure conversation mode is updated
+                  setTimeout(async () => {
+                    const currentConv = useStore.getState().conversations.find(c => c.id === conversationId);
+                    const isCurrentStrictMode = currentConv?.quizMode === 'strict';
+                    
+                    console.log('Auto-quiz check - conversationId:', conversationId);
+                    console.log('Auto-quiz check - currentConv:', currentConv);
+                    console.log('Auto-quiz check - isCurrentStrictMode:', isCurrentStrictMode);
+                    
+                    if (isCurrentStrictMode) {
+                      console.log('Opening quiz automatically for strict mode');
+                      const assistantMessage = {
+                        id: data.chatbot_message_id,
+                        content: fullResponse,
+                        role: 'assistant' as const,
+                        timestamp: new Date(),
+                        conversationId: conversationId,
+                      };
+                      setIsQuizBlocking(true);
+                      setQuizResponseCount(0); // Reset response count for new quiz
+                      await handleOpenSidePopup(assistantMessage);
+                    } else {
+                      console.log('Not opening quiz - not in strict mode');
+                    }
+                  }, 100);
                 } else if (data.status === 'error') {
                   throw new Error(data.error);
                 }
@@ -237,12 +252,14 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
       updateConversationLastMessage(conversationId, assistantMessage.content);
     } finally {
       setIsLoading(false);
-      // Refocus the input field after sending message
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-      }, 100);
+      // Only refocus input field if not in strict mode or quiz is not blocking
+      if (!isStrictMode || !isQuizBlocking) {
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+          }
+        }, 100);
+      }
     }
   };
 
@@ -325,7 +342,20 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                   {activeConversation ? activeConversation.title : ''}
                 </h1>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-4">
+              {/* Mode Display */}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`px-3 py-1 text-xs font-medium rounded-full ${
+                    isStrictMode 
+                      ? 'bg-red-100 text-red-700 border border-red-200' 
+                      : 'bg-green-100 text-green-700 border border-green-200'
+                  }`}
+                >
+                  {isStrictMode ? 'Supervised' : 'Freeform'}
+                </span>
+              </div>
+
               {/* Tags Section */}
               {activeConversation && (
                 <div className="flex items-center">
@@ -487,7 +517,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                   </div>
                 ))}
                 
-                {isLoading && (
+                {isLoading && !isStrictMode && (
                   <div className="flex justify-start">
                     <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
                       <div className="flex space-x-1">
@@ -504,8 +534,8 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Field at Bottom - Only when conversation is active */}
-          {currentMessages.length > 0 && (
+          {/* Input Field at Bottom - Only when conversation is active and not blocked by strict mode quiz */}
+          {currentMessages.length > 0 && !(isStrictMode && isQuizBlocking) && (
             <div className="flex-shrink-0 border-t border-gray-200 bg-transparent">
               <InputField
                 ref={inputRef}
@@ -515,6 +545,21 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                 sidePopupOpen={sidePopupOpen}
                 key={`input-${isQuizBlocking}`}
               />
+            </div>
+          )}
+          
+          {/* Blocked message for strict mode */}
+          {isStrictMode && isQuizBlocking && (
+            <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 p-4">
+              <div className="text-center text-gray-600">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span className="font-medium">Quiz Required</span>
+                </div>
+                <p className="text-sm">Complete the quiz on the right to continue the conversation</p>
+              </div>
             </div>
           )}
         </div>

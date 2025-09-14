@@ -5,11 +5,11 @@ import { useState } from 'react';
 interface QuizModeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectMode: (mode: 'strict' | 'unsupervised') => void;
+  onSelectMode: (mode: 'strict' | 'freeform') => void;
 }
 
 export default function QuizModeModal({ isOpen, onClose, onSelectMode }: QuizModeModalProps) {
-  const [selectedMode, setSelectedMode] = useState<'strict' | 'unsupervised'>('unsupervised');
+  const [selectedMode, setSelectedMode] = useState<'strict' | 'freeform'>('freeform');
 
   if (!isOpen) return null;
 
@@ -27,17 +27,17 @@ export default function QuizModeModal({ isOpen, onClose, onSelectMode }: QuizMod
         </p>
         
         <div className="space-y-4 mb-6">
-          {/* Unsupervised Mode */}
+          {/* Freeform Mode */}
           <div 
             className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-              selectedMode === 'unsupervised' 
+              selectedMode === 'freeform' 
                 ? 'border-blue-500 bg-blue-50' 
                 : 'border-gray-200 hover:border-gray-300'
             }`}
-            onClick={() => setSelectedMode('unsupervised')}
+            onClick={() => setSelectedMode('freeform')}
           >
             <div>
-              <h3 className="font-semibold text-gray-900 mb-1">Unsupervised</h3>
+              <h3 className="font-semibold text-gray-900 mb-1">Freeform</h3>
               <p className="text-sm text-gray-600">
                 Quiz yourself when you want. Click "Quiz me" on any AI response to test your understanding.
               </p>
@@ -72,7 +72,7 @@ export default function QuizModeModal({ isOpen, onClose, onSelectMode }: QuizMod
           <button
             onClick={handleConfirm}
             className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition-colors backdrop-blur-sm ${
-              selectedMode === 'unsupervised' 
+              selectedMode === 'freeform' 
                 ? 'bg-blue-500/90 hover:bg-blue-600/90' 
                 : 'bg-purple-500/90 hover:bg-purple-600/90'
             }`}

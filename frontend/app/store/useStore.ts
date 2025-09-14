@@ -6,7 +6,7 @@ export interface Conversation {
   lastMessage: string;
   timestamp: Date;
   isActive: boolean;
-  quizMode?: 'strict' | 'unsupervised';
+  quizMode?: 'strict' | 'freeform';
 }
 
 export interface Message {
@@ -37,7 +37,7 @@ interface StoreState {
   setConversations: (conversations: Conversation[]) => void;
   loadConversations: (userId: string) => Promise<void>;
   loadMessagesForConversation: (conversationId: string) => Promise<void>;
-  createNewConversation: (userId: string, quizMode?: 'strict' | 'unsupervised') => Promise<Conversation>;
+  createNewConversation: (userId: string, quizMode?: 'strict' | 'freeform') => Promise<Conversation>;
   linkMessageToQuiz: (messageId: string, quizConversationId: string) => void;
   getQuizForMessage: (messageId: string) => string | null;
   openOrCreateQuizForMessage: (message: Message, userId: string, selectQuiz?: boolean) => Promise<Conversation>;
@@ -155,7 +155,13 @@ export const useStore = create<StoreState>((set, get) => ({
       if (!response.ok) {
         throw new Error('Failed to fetch messages');
       }
-      const messages = await response.json();
+      const data = await response.json();
+      const messages = data.messages || data || [];
+      const isStrict = data.isStrict;
+      
+      console.log('loadMessagesForConversation - conversationId:', conversationId);
+      console.log('loadMessagesForConversation - isStrict from API:', isStrict);
+      console.log('loadMessagesForConversation - typeof isStrict:', typeof isStrict);
       
       // Transform the API response to match our Message interface
       const transformedMessages = messages.map((msg: {
@@ -176,7 +182,15 @@ export const useStore = create<StoreState>((set, get) => ({
         messagesByConversation: {
           ...state.messagesByConversation,
           [conversationId]: transformedMessages
-        }
+        },
+        conversations: state.conversations.map(conv => {
+          if (conv.id === conversationId) {
+            const newQuizMode = isStrict === true ? 'strict' : isStrict === false ? 'freeform' : conv.quizMode;
+            console.log(`Updating conversation ${conversationId} quizMode from ${conv.quizMode} to ${newQuizMode}`);
+            return { ...conv, quizMode: newQuizMode };
+          }
+          return conv;
+        })
       }));
     } catch (error) {
       console.error('Error loading messages for conversation:', conversationId, error);
@@ -184,7 +198,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  createNewConversation: async (userId, quizMode = 'unsupervised') => {
+  createNewConversation: async (userId, quizMode = 'freeform') => {
     try {
       const response = await fetch(`http://localhost:5000/api/users/${userId}/sessions`, {
         method: 'POST',

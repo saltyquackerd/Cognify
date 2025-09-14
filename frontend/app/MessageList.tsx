@@ -58,18 +58,11 @@ export default function MessageList() {
     setShowQuizModeModal(true);
   };
 
-  const handleQuizModeSelect = async (mode: 'strict' | 'unsupervised') => {
+  const handleQuizModeSelect = async (mode: 'strict' | 'freeform') => {
     try {
       console.log('MessageList - Creating conversation with mode:', mode);
-      const emptyConv = findEmptyConversation();
-      if (emptyConv) {
-        // Update existing empty conversation with quiz mode
-        updateConversation(emptyConv.id, { quizMode: mode });
-        selectConversation(emptyConv.id);
-      } else {
-        // Create new conversation with quiz mode
-        await createNewConversation('1', mode);
-      }
+      // Always create a new conversation when user clicks "New Chat"
+      await createNewConversation('1', mode);
     } catch (error) {
       console.error('Failed to create new conversation:', error);
       // Fallback to local creation if backend fails
@@ -82,7 +75,9 @@ export default function MessageList() {
         quizMode: mode
       };
       addConversation(newConversation);
+      selectConversation(newConversation.id);
     }
+    setShowQuizModeModal(false);
   };
 
   const handleSelectConversation = (id: string) => {
