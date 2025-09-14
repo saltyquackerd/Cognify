@@ -16,6 +16,7 @@ export default function MessageList() {
   } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Load conversations from API on mount
   useEffect(() => {
@@ -75,98 +76,131 @@ export default function MessageList() {
   };
 
   return (
-    <div className="flex flex-col h-full w-80 bg-gray-50 border-r border-gray-200 flex-shrink-0">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+    <div className={`flex flex-col h-full ${isCollapsed ? 'w-16' : 'w-80'} bg-white border-r border-gray-200 flex-shrink-0 transition-all duration-300`}>
+      {/* Header with Logo/Brand */}
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {!isCollapsed && <span className="text-lg font-inter text-gray-900">Cognify</span>}
+        </div>
+        
         <button
-          onClick={handleNewChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 font-medium"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <svg className={`w-4 h-4 text-gray-600 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          New chat
         </button>
       </div>
 
-      {/* Search */}
-      <div className="p-4">
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
-          />
-        </div>
-      </div>
-
-      {/* Conversations List */}
-      <div className="flex-1 overflow-y-auto px-2 pb-4">
-        {filteredConversations.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            {searchQuery ? 'No conversations found' : 'No conversations yet'}
+      {!isCollapsed && (
+        <>
+          {/* New Chat Button */}
+          <div className="p-4 border-b border-gray-200">
+            <button
+              onClick={handleNewChat}
+              className="w-full flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium border border-gray-200 text-gray-700"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New chat
+            </button>
           </div>
-        ) : (
-          <div className="space-y-1">
-            {filteredConversations.map((conversation: Conversation) => (
-              <div
-                key={conversation.id}
-                className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                  conversation.isActive
-                    ? 'bg-blue-50 border border-blue-200'
-                    : 'hover:bg-gray-100'
-                }`}
-                onClick={() => handleSelectConversation(conversation.id)}
-              >
-                {/* Chat Icon */}
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
 
-                {/* Conversation Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className={`text-sm font-medium truncate ${
-                      conversation.isActive 
-                        ? 'text-blue-900' 
-                        : 'text-gray-900'
-                    }`}>
-                      {conversation.title}
-                    </h3>
-                    <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                      {formatTimestamp(conversation.timestamp)}
-                    </span>
-                  </div>
-                  <p className={`text-xs truncate mt-1 ${
-                    conversation.isActive 
-                      ? 'text-blue-700' 
-                      : 'text-gray-600'
-                  }`}>
-                    {conversation.lastMessage}
-                  </p>
-                </div>
-
-                {/* Delete Button */}
-                <button
-                  onClick={(e) => handleDeleteClick(e, conversation.id)}
-                  className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1 rounded hover:bg-gray-200 transition-opacity"
-                >
-                  <svg className="w-4 h-4 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+          {/* Conversations List */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Search */}
+            <div className="p-3 border-b border-gray-200">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 text-sm"
+                />
               </div>
-            ))}
+            </div>
+
+            {/* Conversation Items */}
+            <div className="px-2 py-2">
+              {filteredConversations.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  {searchQuery ? 'No conversations found' : 'No conversations yet'}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredConversations.map((conversation: Conversation) => (
+                    <div
+                      key={conversation.id}
+                      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
+                        conversation.isActive
+                          ? 'bg-blue-50 border-l-2 border-blue-500'
+                          : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleSelectConversation(conversation.id)}
+                    >
+                      {/* Chat Icon */}
+                      <div className="flex-shrink-0">
+                        <svg className={`w-4 h-4 ${conversation.isActive ? 'text-blue-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                      </div>
+
+                      {/* Conversation Content */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`text-sm font-medium truncate ${
+                          conversation.isActive 
+                            ? 'text-blue-900' 
+                            : 'text-gray-900'
+                        }`}>
+                          {conversation.title}
+                        </h3>
+                        <p className={`text-xs truncate mt-0.5 ${
+                          conversation.isActive 
+                            ? 'text-blue-700' 
+                            : 'text-gray-500'
+                        }`}>
+                          {conversation.lastMessage}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs text-gray-400">
+                          {formatTimestamp(conversation.timestamp)}
+                        </span>
+                        <button
+                          onClick={(e) => handleDeleteClick(e, conversation.id)}
+                          className="p-1 rounded hover:bg-gray-200 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Bottom Section */}
+          <div className="p-3 border-t border-gray-200">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>User Account</span>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
