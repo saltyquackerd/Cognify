@@ -21,44 +21,86 @@ interface SidePopupProps {
 }
 
 export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange, messageId }: SidePopupProps) {
-  const { getThreadForMessage, getMessagesForConversation, createThreadForMessage } = useStore();
+  const { getQuizForMessage, createQuizForMessage, selectedConversationId } = useStore();
   
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (initialMessage) {
-      return [{
-        id: Date.now().toString(),
-        content: initialMessage,
-        role: 'assistant',
-        timestamp: new Date()
-      }];
-    }
-    return [];
-  });
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [width, setWidth] = useState(384); // w-96 = 384px
   const [isResizing, setIsResizing] = useState(false);
+  const [hasQuiz, setHasQuiz] = useState(false);
+  const [askedInitial, setAskedInitial] = useState(false);
+  const [isCreatingThread, setIsCreatingThread] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
 
-  // Load thread messages when messageId changes
+  // Ensure quiz exists and ask initial question
   useEffect(() => {
     if (messageId) {
-      const threadConversationId = getThreadForMessage(messageId);
-      if (threadConversationId) {
-        // Load messages from the thread conversation
-        const threadMessages = getMessagesForConversation(threadConversationId);
-        setMessages(threadMessages);
+      const quizConversationId = getQuizForMessage(messageId);
+      if (quizConversationId) {
+        setHasQuiz(true);
+        if (!askedInitial) {
+          // Ask the first question automatically
+          (async () => {
+            try {
+              await askQuestion(quizConversationId);
+              setAskedInitial(true);
+            } catch (e) {
+              console.error(e);
+            }
+          })();
+        }
       } else {
-        // No thread exists yet, show just the initial message
-        setMessages([{
-          id: Date.now().toString(),
-          content: initialMessage,
-          role: 'assistant',
-          timestamp: new Date()
-        }]);
+        // No quiz exists yet; show nothing until user creates
+        setHasQuiz(false);
+        setAskedInitial(false);
       }
     }
-  }, [messageId, getThreadForMessage, getMessagesForConversation, initialMessage]);
+  }, [messageId, getQuizForMessage, askedInitial]);
+
+  const askQuestion = async (quizId: string) => {
+    const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/ask-question`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.error('Failed to ask quiz question', response.status, errText);
+      throw new Error('Failed to ask quiz question');
+    }
+    const data = await response.json();
+    const questionMessage: Message = {
+      id: data.quiz_message_id || (Date.now() + 1).toString(),
+      content: typeof data.quiz_questions === 'string' ? data.quiz_questions : String(data.quiz_questions),
+      role: 'assistant',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, questionMessage]);
+  };
+
+  const handleCreateQuizThread = async () => {
+    if (!messageId || !selectedConversationId || isCreatingThread) return;
+    
+    setIsCreatingThread(true);
+    try {
+      // Create quiz conversation (non-streaming backend)
+      const quizConv = await createQuizForMessage({
+        id: messageId,
+        content: initialMessage,
+        role: 'assistant',
+        timestamp: new Date(),
+        conversationId: selectedConversationId
+      }, '1');
+      
+      setHasQuiz(true);
+      setMessages([]);
+      setAskedInitial(true);
+      await askQuestion(quizConv.id);
+    } catch (error) {
+      console.error('Failed to create quiz thread:', error);
+    } finally {
+      setIsCreatingThread(false);
+    }
+  };
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
@@ -122,43 +164,43 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     setIsLoading(true);
 
     try {
-      // Get or create thread conversation
-      let threadConversationId = getThreadForMessage(messageId);
+      // Get or create quiz conversation
+      let threadConversationId = getQuizForMessage(messageId);
       
       if (!threadConversationId) {
-        // Create a new thread conversation (without selecting it)
-        const threadConv = await createThreadForMessage({
+        // Create a new quiz conversation (without selecting it)
+        const threadConv = await createQuizForMessage({
           id: messageId,
           content: initialMessage,
           role: 'assistant',
           timestamp: new Date(),
-          conversationId: ''
+          conversationId: selectedConversationId || ''
         }, '1');
         threadConversationId = threadConv.id;
       }
 
-      // Send message to the thread conversation
-      const response = await fetch('http://localhost:5000/api/chat', {
+      // For quiz, send answers to the non-streaming endpoint
+      const quizId = threadConversationId;
+      const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/answer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: content,
-          session_id: threadConversationId
+          answer: content
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error('Failed to submit quiz answer');
       }
 
       const data = await response.json();
       
-      // Create assistant message from backend response
+      // Create assistant message from backend evaluation
       const assistantMessage: Message = {
-        id: data.chatbot_message_id || (Date.now() + 1).toString(),
-        content: data.chat_response,
+        id: data.evaluation_message_id || (Date.now() + 1).toString(),
+        content: data.evaluation,
         role: 'assistant',
         timestamp: new Date(),
       };
@@ -192,6 +234,16 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
             {title} - Fullscreen
           </h2>
           <div className="flex items-center space-x-2">
+            {!hasQuiz && messageId && (
+              <button
+                onClick={handleCreateQuizThread}
+                disabled={isCreatingThread}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Create quiz thread for this message"
+              >
+                {isCreatingThread ? 'Creating...' : 'Create Quiz'}
+              </button>
+            )}
             <button
               onClick={toggleFullscreen}
               className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600"
@@ -279,6 +331,16 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
           {title}
         </h2>
         <div className="flex items-center space-x-2">
+          {!hasQuiz && messageId && (
+            <button
+              onClick={handleCreateQuizThread}
+              disabled={isCreatingThread}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Create quiz thread for this message"
+            >
+              {isCreatingThread ? 'Creating...' : 'Create Quiz'}
+            </button>
+          )}
           <button
             onClick={toggleFullscreen}
             className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -336,13 +398,34 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       </div>
 
       {/* Input Field */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-gray-200 p-4 space-y-3">
         <InputField
           onSendMessage={handleSendMessage}
           disabled={isLoading}
-          placeholder={width < 390 ? "Continue..." : "Continue conversation..."}
+          placeholder={width < 390 ? "Type your answer..." : "Type your answer to the question..."}
           showInstructions={false}
         />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (!messageId) return;
+              const quizId = getQuizForMessage(messageId);
+              if (quizId) {
+                askQuestion(quizId);
+              }
+            }}
+            className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            disabled={!hasQuiz || !messageId || isLoading}
+          >
+            Quiz me again
+          </button>
+          <button
+            onClick={onClose}
+            className="px-3 py-2 text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+          >
+            Back
+          </button>
+        </div>
       </div>
     </div>
   );
