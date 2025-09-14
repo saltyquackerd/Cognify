@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import InputField from './InputField';
+import { useStore } from './store/useStore';
 
 interface Message {
   id: string;
@@ -16,9 +17,12 @@ interface SidePopupProps {
   initialMessage: string;
   title: string;
   onWidthChange?: (width: number) => void;
+  messageId?: string | null;
 }
 
-export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange }: SidePopupProps) {
+export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange, messageId }: SidePopupProps) {
+  const { getThreadForMessage, getMessagesForConversation, createThreadForMessage } = useStore();
+  
   const [messages, setMessages] = useState<Message[]>(() => {
     if (initialMessage) {
       return [{
@@ -35,6 +39,26 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
   const [width, setWidth] = useState(384); // w-96 = 384px
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
+
+  // Load thread messages when messageId changes
+  useEffect(() => {
+    if (messageId) {
+      const threadConversationId = getThreadForMessage(messageId);
+      if (threadConversationId) {
+        // Load messages from the thread conversation
+        const threadMessages = getMessagesForConversation(threadConversationId);
+        setMessages(threadMessages);
+      } else {
+        // No thread exists yet, show just the initial message
+        setMessages([{
+          id: Date.now().toString(),
+          content: initialMessage,
+          role: 'assistant',
+          timestamp: new Date()
+        }]);
+      }
+    }
+  }, [messageId, getThreadForMessage, getMessagesForConversation, initialMessage]);
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
@@ -85,6 +109,8 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
   }, [width, onWidthChange]);
 
   const handleSendMessage = async (content: string) => {
+    if (!messageId) return;
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
@@ -95,17 +121,64 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Get or create thread conversation
+      let threadConversationId = getThreadForMessage(messageId);
+      
+      if (!threadConversationId) {
+        // Create a new thread conversation (without selecting it)
+        const threadConv = await createThreadForMessage({
+          id: messageId,
+          content: initialMessage,
+          role: 'assistant',
+          timestamp: new Date(),
+          conversationId: ''
+        }, '1');
+        threadConversationId = threadConv.id;
+      }
+
+      // Send message to the thread conversation
+      const response = await fetch('http://localhost:5000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: content,
+          session_id: threadConversationId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      const data = await response.json();
+      
+      // Create assistant message from backend response
+      const assistantMessage: Message = {
+        id: data.chatbot_message_id || (Date.now() + 1).toString(),
+        content: data.chat_response,
+        role: 'assistant',
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+    } catch (error) {
+      console.error('Error sending message to thread:', error);
+      
+      // Fallback to simulated response if backend fails
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "This is a follow-up response in the side panel. I can help you explore this topic further!",
+        content: "I'm sorry, I'm having trouble connecting to the server. Please try again later.",
         role: 'assistant',
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, assistantMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   if (!isOpen) return null;

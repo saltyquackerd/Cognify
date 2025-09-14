@@ -14,6 +14,8 @@ export interface Message {
   role: 'user' | 'assistant';
   timestamp: Date;
   conversationId: string;
+  // Optional: thread conversation created from this message
+  threadConversationId?: string;
 }
 
 interface StoreState {
@@ -23,6 +25,8 @@ interface StoreState {
   
   // Messages organized by conversation ID
   messagesByConversation: Record<string, Message[]>;
+  // Map parent message id -> thread conversation id
+  messageThreadMap: Record<string, string>;
   
   // Actions
   addConversation: (conversation: Conversation) => void;
@@ -33,8 +37,14 @@ interface StoreState {
   loadConversations: (userId: string) => Promise<void>;
   loadMessagesForConversation: (conversationId: string) => Promise<void>;
   createNewConversation: (userId: string) => Promise<Conversation>;
+  linkMessageToThread: (messageId: string, threadConversationId: string) => void;
+  getThreadForMessage: (messageId: string) => string | null;
+  openOrCreateThreadForMessage: (message: Message, userId: string, selectThread?: boolean) => Promise<Conversation>;
+  createThreadForMessage: (message: Message, userId: string) => Promise<Conversation>;
   
   addMessage: (message: Message) => void;
+  updateMessageContent: (messageId: string, content: string) => void;
+  updateMessageId: (oldMessageId: string, newMessageId: string) => void;
   setMessagesForConversation: (conversationId: string, messages: Message[]) => void;
   getMessagesForConversation: (conversationId: string) => Message[];
   updateConversationLastMessage: (conversationId: string, lastMessage: string) => void;
@@ -49,6 +59,7 @@ export const useStore = create<StoreState>((set, get) => ({
   conversations: [],
   selectedConversationId: null,
   messagesByConversation: {},
+  messageThreadMap: {},
 
   // Conversation actions
   addConversation: (conversation) => {
@@ -192,6 +203,134 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
+  linkMessageToThread: (messageId, threadConversationId) => {
+    set((state) => ({
+      messageThreadMap: {
+        ...state.messageThreadMap,
+        [messageId]: threadConversationId
+      }
+    }));
+  },
+
+  getThreadForMessage: (messageId) => {
+    const { messageThreadMap } = get();
+    return messageThreadMap[messageId] || null;
+  },
+
+  openOrCreateThreadForMessage: async (message, userId, selectThread = false) => {
+    const existingThreadId = get().getThreadForMessage(message.id);
+    if (existingThreadId) {
+      // Return existing thread conversation
+      if (selectThread) {
+        get().selectConversation(existingThreadId);
+      }
+      return get().getConversationById(existingThreadId)!;
+    }
+
+    // Create a new conversation/thread
+    const newConv = await get().createNewConversation(userId);
+
+    // Give it a thread-like title and initial last message
+    const threadTitle = `Thread: ${message.content.slice(0, 30)}${message.content.length > 30 ? '…' : ''}`;
+    get().updateConversation(newConv.id, { title: threadTitle });
+    get().updateConversationLastMessage(newConv.id, message.content);
+
+    // Seed the thread with the original assistant message
+    const seededAssistantMessage: Message = {
+      id: `${message.id}-seed`,
+      content: message.content,
+      role: 'assistant',
+      timestamp: new Date(),
+      conversationId: newConv.id,
+    };
+    get().setMessagesForConversation(newConv.id, [seededAssistantMessage]);
+
+    // Link original message -> thread and also annotate original message
+    set((state) => {
+      const { [message.conversationId]: msgs = [] } = state.messagesByConversation;
+      const updatedMsgs = msgs.map((m) => m.id === message.id ? { ...m, threadConversationId: newConv.id } : m);
+      return {
+        messageThreadMap: { ...state.messageThreadMap, [message.id]: newConv.id },
+        messagesByConversation: {
+          ...state.messagesByConversation,
+          [message.conversationId]: updatedMsgs
+        }
+      };
+    });
+
+    // Only select the thread if explicitly requested
+    if (selectThread) {
+      get().selectConversation(newConv.id);
+    }
+    return newConv;
+  },
+
+  createThreadForMessage: async (message, userId) => {
+    // Create quiz thread using the dedicated endpoint
+    try {
+      const response = await fetch(`http://localhost:5000/api/create-quiz-thread`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message_id: message.id,
+          session_id: message.conversationId
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create quiz thread');
+      }
+      
+      const quizData = await response.json();
+      
+      // Create thread conversation (not added to main conversations)
+      const threadConversation: Conversation = {
+        id: quizData.quiz_id,
+        title: `Quiz Thread: ${message.content.slice(0, 30)}${message.content.length > 30 ? '…' : ''}`,
+        lastMessage: message.content,
+        timestamp: new Date(),
+        isActive: false
+      };
+      
+      // Seed the thread with the original assistant message and quiz questions
+      const seededAssistantMessage: Message = {
+        id: `${message.id}-seed`,
+        content: message.content,
+        role: 'assistant',
+        timestamp: new Date(),
+        conversationId: threadConversation.id,
+      };
+      
+      // Add quiz questions as assistant messages
+      const quizMessages: Message[] = quizData.quiz_questions.map((q: any, index: number) => ({
+        id: `${quizData.quiz_id}-quiz-${index}`,
+        content: `Q${index + 1}: ${q.question}`,
+        role: 'assistant' as const,
+        timestamp: new Date(),
+        conversationId: threadConversation.id,
+      }));
+      
+      // Store thread messages separately (not in main conversations)
+      set((state) => ({
+        messageThreadMap: {
+          ...state.messageThreadMap,
+          [message.id]: threadConversation.id
+        },
+        messagesByConversation: {
+          ...state.messagesByConversation,
+          [threadConversation.id]: [seededAssistantMessage, ...quizMessages]
+        }
+      }));
+      
+      return threadConversation;
+    } catch (error) {
+      console.error('Error creating quiz thread:', error);
+      throw error;
+    }
+  },
+
   // Message actions
   addMessage: (message) => {
     set((state) => ({
@@ -202,6 +341,36 @@ export const useStore = create<StoreState>((set, get) => ({
           message
         ]
       }
+    }));
+  },
+
+  updateMessageContent: (messageId, content) => {
+    set((state) => ({
+      messagesByConversation: Object.fromEntries(
+        Object.entries(state.messagesByConversation).map(([convId, messages]) => [
+          convId,
+          messages.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, content }
+              : msg
+          )
+        ])
+      )
+    }));
+  },
+
+  updateMessageId: (oldMessageId, newMessageId) => {
+    set((state) => ({
+      messagesByConversation: Object.fromEntries(
+        Object.entries(state.messagesByConversation).map(([convId, messages]) => [
+          convId,
+          messages.map(msg => 
+            msg.id === oldMessageId 
+              ? { ...msg, id: newMessageId }
+              : msg
+          )
+        ])
+      )
     }));
   },
 
