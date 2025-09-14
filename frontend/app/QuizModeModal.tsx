@@ -23,7 +23,7 @@ export default function QuizModeModal({ isOpen, onClose, onSelectMode }: QuizMod
       <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl border border-white/20">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Choose Quiz Mode</h2>
         <p className="text-gray-600 mb-6">
-          Select how you'd like to be quizzed during this conversation:
+          Select how you&apos;d like to be quizzed during this conversation:
         </p>
         
         <div className="space-y-4 mb-6">
@@ -39,7 +39,7 @@ export default function QuizModeModal({ isOpen, onClose, onSelectMode }: QuizMod
             <div>
               <h3 className="font-semibold text-gray-900 mb-1">Freeform</h3>
               <p className="text-sm text-gray-600">
-                Quiz yourself when you want. Click "Quiz me" on any AI response to test your understanding.
+                Quiz yourself when you want. Click &quot;Quiz me&quot; on any AI response to test your understanding.
               </p>
             </div>
           </div>

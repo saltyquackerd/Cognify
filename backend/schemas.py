@@ -31,7 +31,7 @@ class SessionSchema:
     """Session schema based on app.py data structure"""
     
     @staticmethod
-    def create_session_document(session_id: str, user_id: str) -> Dict:
+    def create_session_document(session_id: str, user_id: str, isStrict: bool = False) -> Dict:
         """Create a new session document matching app.py structure"""
         return {
             '_id': session_id,
@@ -39,7 +39,8 @@ class SessionSchema:
             'created_at': datetime.now().isoformat(),
             'messages': [],
             'quizzes': [],
-            'conversation_history': []
+            'conversation_history': [],
+            'isStrict': isStrict
         }
     
     @staticmethod

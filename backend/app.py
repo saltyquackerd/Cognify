@@ -14,7 +14,9 @@ from graph_service import GraphServices
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS for production
+frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+CORS(app, origins=[frontend_url])
 
 # Initialize services
 llm_service = LLM()
@@ -29,25 +31,15 @@ except Exception as e:
 # In-memory storage for demo purposes (use a database in production)
 # Data structure: users -> sessions -> quizzes
 users = {}  # user_id -> user_data
+users['1'] = {
+    'id': '1',
+    'username': 'Zailey',
+    'created_at': '2025-09-15T10:30:00',
+    'sessions': []
+}
 sessions = {}  # session_id -> session_data  
 quizzes = {}  # quiz_id -> quizzes
 tags = set()  # all tags
-
-# Add test data
-def initialize_test_data():
-    """Initialize test data for development and testing"""
-    global users, sessions, quizzes
-    
-    # Test user
-    users['1'] = {
-        'id': '1',
-        'username': 'Zailey',
-        'created_at': '2025-09-15T10:30:00',
-        'sessions': []
-    }
-
-# Initialize test data
-initialize_test_data()
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
@@ -118,6 +110,8 @@ def create_session(user_id):
     try:
         if user_id not in users:
             return jsonify({'error': 'User not found'}), 404
+        data = request.get_json()
+        isStrict = data.get('isStrict', False)
         
         # Create new session
         session_id = str(uuid.uuid4())
@@ -128,7 +122,8 @@ def create_session(user_id):
             'title': '',
             'messages': [],
             'quizzes': [],
-            'conversation_history': []
+            'conversation_history': [],
+            'isStrict': isStrict
         }
         
         # Add session to user
@@ -572,7 +567,7 @@ def get_conversation_messages_endpoint(conv_id):
             return jsonify({'error': 'Conversation not found'}), 404
             
         messages = get_conversation_messages(conv_id)
-        return jsonify(messages)
+        return jsonify({'messages': messages, 'isStrict': sessions[conv_id].get('isStrict', False)})
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -721,4 +716,5 @@ def get_knowledge_graph():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

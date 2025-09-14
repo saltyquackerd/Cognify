@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Poppins } from "next/font/google";
 import "./globals.css";
+import "reactflow/dist/style.css";
 
 const geistSans = Inter({
   variable: "--font-geist-sans",

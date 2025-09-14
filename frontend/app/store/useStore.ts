@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_URLS } from '../../lib/api';
 
 export interface Conversation {
   id: string;
@@ -121,7 +122,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   loadConversations: async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}/conversations`);
+      const response = await fetch(API_URLS.USER_CONVERSATIONS(userId));
       console.log(response);
       if (!response.ok) {
         throw new Error('Failed to fetch conversations');
@@ -151,7 +152,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   loadMessagesForConversation: async (conversationId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${conversationId}/messages`);
+      const response = await fetch(API_URLS.CONVERSATION_MESSAGES(conversationId));
       if (!response.ok) {
         throw new Error('Failed to fetch messages');
       }
@@ -200,7 +201,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   createNewConversation: async (userId, quizMode = 'freeform') => {
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}/sessions`, {
+      const response = await fetch(API_URLS.USER_SESSIONS(userId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -308,7 +309,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // Create quiz thread using the new non-streaming endpoint
     try {
       console.log('Store: Creating quiz for message:', message.id);
-      const response = await fetch(`http://localhost:5000/api/sessions/${message.conversationId}/quiz/start`, {
+      const response = await fetch(API_URLS.SESSION_QUIZ_START(message.conversationId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
