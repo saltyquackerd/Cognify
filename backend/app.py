@@ -587,7 +587,7 @@ def get_conversation_messages_endpoint(conv_id):
         return jsonify({'error': str(e)}), 500
 
 def get_quiz_messages(quiz_id):
-    """Get all messages for a specific quiz"""
+    """Get all messages for a specific quiz, excluding the first two messages"""
     try:
         if quiz_id not in quizzes:
             return []
@@ -595,17 +595,16 @@ def get_quiz_messages(quiz_id):
         quiz_data = quizzes[quiz_id]
         messages = []
         
-        # Get messages from the quiz's messages array
-        if quiz_data.get('messages') and len(quiz_data['messages']) > 0:
-            for msg in quiz_data['messages']:
-                # Each message is already a single message with the new structure
-                messages.append({
-                    'id': msg['message_id'],
-                    'content': msg['message'],
-                    'role': msg['role'],
-                    'timestamp': msg['timestamp'],
-                    'quizId': quiz_id
-                })
+        # Get messages from the quiz's messages array, skipping the first two
+        quiz_messages = quiz_data.get('messages', [])
+        for msg in quiz_messages[2:]:
+            messages.append({
+                'id': msg['message_id'],
+                'content': msg['message'],
+                'role': msg['role'],
+                'timestamp': msg['timestamp'],
+                'quizId': quiz_id
+            })
         
         # Sort messages by timestamp
         messages.sort(key=lambda x: x['timestamp'])
