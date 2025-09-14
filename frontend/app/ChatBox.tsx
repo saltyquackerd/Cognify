@@ -77,6 +77,8 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   const [popupMessage, setPopupMessage] = useState('');
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [currentSidePopupWidth, setCurrentSidePopupWidth] = useState(384);
+  const [isQuizBlocking, setIsQuizBlocking] = useState(false);
+  const [quizResponseCount, setQuizResponseCount] = useState(0);
   
   console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
   console.log('ChatBox render - selectedConversationId:', selectedConversationId);
@@ -85,6 +87,8 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   console.log('ChatBox render - currentMessages length:', currentMessages.length);
   console.log('ChatBox render - conversations array:', conversations);
   console.log('ChatBox render - conversations length:', conversations.length);
+  console.log('ChatBox render - isQuizBlocking:', isQuizBlocking);
+  console.log('ChatBox render - quizResponseCount:', quizResponseCount);
 
   const handleSendMessage = async (content: string) => {
     console.log('handleSendMessage called with content:', content);
@@ -190,6 +194,21 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                   if (data.title && data.title !== 'New conversation') {
                     useStore.getState().updateConversation(conversationId, { title: data.title });
                   }
+                  
+                  // Check if this is strict mode and auto-open quiz
+                  const currentConv = useStore.getState().conversations.find(c => c.id === conversationId);
+                  if (currentConv?.quizMode === 'strict') {
+                    const assistantMessage = {
+                      id: data.chatbot_message_id,
+                      content: fullResponse,
+                      role: 'assistant' as const,
+                      timestamp: new Date(),
+                      conversationId: conversationId,
+                    };
+                    setIsQuizBlocking(true);
+                    setQuizResponseCount(0); // Reset response count for new quiz
+                    await handleOpenSidePopup(assistantMessage);
+                  }
                 } else if (data.status === 'error') {
                   throw new Error(data.error);
                 }
@@ -260,6 +279,28 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     setSidePopupOpen(false);
     setPopupMessage('');
     setSelectedMessageId(null);
+    // Only unblock if we have at least one response
+    if (quizResponseCount > 0) {
+      setIsQuizBlocking(false);
+    }
+  };
+
+  const handleQuizResponseCountChange = (count: number) => {
+    console.log('handleQuizResponseCountChange called with count:', count);
+    console.log('Current isQuizBlocking state:', isQuizBlocking);
+    setQuizResponseCount(count);
+    // Unblock input if we have at least one response
+    if (count > 0 && isQuizBlocking) {
+      console.log('Unblocking input - response count > 0');
+      setIsQuizBlocking(false);
+      // Force focus to input field after unblocking
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          console.log('Focused input field after unblocking');
+        }
+      }, 100);
+    }
   };
 
   return (
@@ -368,9 +409,10 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
             <InputField
               ref={inputRef}
               onSendMessage={handleSendMessage}
-              disabled={isLoading}
-              placeholder="Message Cognify..."
+              disabled={isQuizBlocking}
+              placeholder={isQuizBlocking ? "Complete the quiz to continue..." : "Message Cognify..."}
               sidePopupOpen={sidePopupOpen}
+              key={`input-${isQuizBlocking}`}
             />
             </div>
         </div>
@@ -386,6 +428,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
           title="Check Your Recall"
           onWidthChange={setCurrentSidePopupWidth}
           messageId={selectedMessageId}
+          onResponseCountChange={handleQuizResponseCountChange}
         />
       )}
     </div>

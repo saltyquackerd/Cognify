@@ -18,9 +18,10 @@ interface SidePopupProps {
   title: string;
   onWidthChange?: (width: number) => void;
   messageId?: string | null;
+  onResponseCountChange?: (count: number) => void;
 }
 
-export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange, messageId }: SidePopupProps) {
+export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange, messageId, onResponseCountChange }: SidePopupProps) {
   const { selectedConversationId } = useStore();
   // Subscribe to the specific quiz id for this message so changes trigger re-render
   const quizConversationId = useStore((state) => (messageId ? state.messageQuizMap[messageId] : null));
@@ -50,7 +51,11 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     setAskedInitial(false);
     setHasQuiz(false);
     setIsAskingQuestion(false);
-  }, [messageId]);
+    // Reset response count when opening new quiz
+    if (onResponseCountChange) {
+      onResponseCountChange(0);
+    }
+  }, [messageId, onResponseCountChange]);
 
   // Ensure quiz exists and ask initial question
   useEffect(() => {
@@ -198,6 +203,14 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       onWidthChange(width);
     }
   }, [width, onWidthChange]);
+
+  // Track response count and notify parent
+  useEffect(() => {
+    const userResponseCount = messages.filter(msg => msg.role === 'user').length;
+    if (onResponseCountChange) {
+      onResponseCountChange(userResponseCount);
+    }
+  }, [messages, onResponseCountChange]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
