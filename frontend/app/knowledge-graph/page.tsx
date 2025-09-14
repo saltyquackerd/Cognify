@@ -59,206 +59,96 @@ export default function KnowledgeGraphPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  // Sample knowledge graph data
+  // Load knowledge graph data
   useEffect(() => {
-    const sampleNodes: Node[] = [
-      {
-        id: 'ai',
-        type: 'customNode',
-        position: { x: 400, y: 200 },
-        data: { 
-          label: 'Artificial Intelligence', 
-          color: '#E0E7FF', 
-          textColor: '#3730A3',
-          category: 'Core Concept'
+    const loadKnowledgeGraph = async () => {
+      try {
+        // Replace with your actual API endpoint
+        const response = await fetch('/api/knowledge-graph');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch knowledge graph data');
         }
-      },
-      {
-        id: 'ml',
-        type: 'customNode',
-        position: { x: 200, y: 300 },
-        data: { 
-          label: 'Machine Learning', 
-          color: '#D1FAE5', 
-          textColor: '#065F46',
-          category: 'Technology'
-        }
-      },
-      {
-        id: 'dl',
-        type: 'customNode',
-        position: { x: 100, y: 400 },
-        data: { 
-          label: 'Deep Learning', 
-          color: '#EDE9FE', 
-          textColor: '#581C87',
-          category: 'Method'
-        }
-      },
-      {
-        id: 'nlp',
-        type: 'customNode',
-        position: { x: 600, y: 300 },
-        data: { 
-          label: 'Natural Language Processing', 
-          color: '#FEF3C7', 
-          textColor: '#92400E',
-          category: 'Application'
-        }
-      },
-      {
-        id: 'cv',
-        type: 'customNode',
-        position: { x: 300, y: 450 },
-        data: { 
-          label: 'Computer Vision', 
-          color: '#FEE2E2', 
-          textColor: '#991B1B',
-          category: 'Application'
-        }
-      },
-      {
-        id: 'nn',
-        type: 'customNode',
-        position: { x: 150, y: 150 },
-        data: { 
-          label: 'Neural Networks', 
-          color: '#CFFAFE', 
-          textColor: '#155E75',
-          category: 'Technology'
-        }
-      },
-      {
-        id: 'transformers',
-        type: 'customNode',
-        position: { x: 700, y: 400 },
-        data: { 
-          label: 'Transformers', 
-          color: '#ECFDF5', 
-          textColor: '#166534',
-          category: 'Method'
-        }
-      },
-      {
-        id: 'gpt',
-        type: 'customNode',
-        position: { x: 800, y: 200 },
-        data: { 
-          label: 'GPT Models', 
-          color: '#FED7AA', 
-          textColor: '#9A3412',
-          category: 'Application'
-        }
-      },
-    ];
-
-    const sampleEdges: Edge[] = [
-      { 
-        id: 'e1-2', 
-        source: 'ai', 
-        target: 'ml', 
-        label: 'includes',
-        type: 'smoothstep',
-        animated: true,
-        style: { 
-          stroke: '#9CA3AF', 
-          strokeWidth: 3,
-          strokeDasharray: '0'
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-      { 
-        id: 'e2-3', 
-        source: 'ml', 
-        target: 'dl', 
-        label: 'subset of',
-        type: 'smoothstep',
-        style: { 
-          stroke: '#A78BFA', 
-          strokeWidth: 2,
-          strokeDasharray: '5,5'
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-      { 
-        id: 'e2-5', 
-        source: 'ml', 
-        target: 'cv', 
-        label: 'enables',
-        type: 'smoothstep',
-        style: { 
-          stroke: '#34D399', 
-          strokeWidth: 2
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-      { 
-        id: 'e1-4', 
-        source: 'ai', 
-        target: 'nlp', 
-        label: 'includes',
-        type: 'smoothstep',
-        animated: true,
-        style: { 
-          stroke: '#9CA3AF', 
-          strokeWidth: 3
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-      { 
-        id: 'e3-6', 
-        source: 'dl', 
-        target: 'nn', 
-        label: 'uses',
-        type: 'smoothstep',
-        style: { 
-          stroke: '#60A5FA', 
-          strokeWidth: 2
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-      { 
-        id: 'e4-7', 
-        source: 'nlp', 
-        target: 'transformers', 
-        label: 'uses',
-        type: 'smoothstep',
-        style: { 
-          stroke: '#FBBF24', 
-          strokeWidth: 2
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-      { 
-        id: 'e7-8', 
-        source: 'transformers', 
-        target: 'gpt', 
-        label: 'powers',
-        type: 'smoothstep',
-        animated: true,
-        style: { 
-          stroke: '#F87171', 
-          strokeWidth: 3
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-      { 
-        id: 'e6-3', 
-        source: 'nn', 
-        target: 'dl', 
-        label: 'foundation of',
-        type: 'smoothstep',
-        style: { 
-          stroke: '#22D3EE', 
-          strokeWidth: 2,
-          strokeDasharray: '8,4'
-        },
-        labelStyle: { fill: '#6B7280', fontWeight: 500 }
-      },
-    ];
-
-    setNodes(sampleNodes);
-    setEdges(sampleEdges);
+        
+        const data = await response.json();
+        
+        // Transform API data to React Flow format if needed
+        const transformedNodes = data.nodes?.map((node: any) => ({
+          id: node.id,
+          type: 'customNode',
+          position: { x: node.x || Math.random() * 800, y: node.y || Math.random() * 600 },
+          data: {
+            label: node.label,
+            color: node.color || '#E0E7FF',
+            textColor: node.textColor || '#374151',
+            category: node.category || 'Concept'
+          }
+        })) || [];
+        
+        const transformedEdges = data.edges?.map((edge: any, index: number) => ({
+          id: edge.id || `edge-${index}`,
+          source: edge.source,
+          target: edge.target,
+          label: edge.label,
+          type: 'smoothstep',
+          animated: edge.animated || false,
+          style: {
+            stroke: edge.color || '#9CA3AF',
+            strokeWidth: edge.width || 2,
+            strokeDasharray: edge.dashed ? '5,5' : '0'
+          },
+          labelStyle: { fill: '#6B7280', fontWeight: 500 }
+        })) || [];
+        
+        setNodes(transformedNodes);
+        setEdges(transformedEdges);
+        
+      } catch (error) {
+        console.error('Error loading knowledge graph:', error);
+        
+        // Fallback to sample data if API fails
+        const fallbackNodes: Node[] = [
+          {
+            id: 'ai',
+            type: 'customNode',
+            position: { x: 400, y: 200 },
+            data: { 
+              label: 'Artificial Intelligence', 
+              color: '#E0E7FF', 
+              textColor: '#3730A3',
+              category: 'Core Concept'
+            }
+          },
+          {
+            id: 'ml',
+            type: 'customNode',
+            position: { x: 200, y: 300 },
+            data: { 
+              label: 'Machine Learning', 
+              color: '#D1FAE5', 
+              textColor: '#065F46',
+              category: 'Technology'
+            }
+          }
+        ];
+        
+        const fallbackEdges: Edge[] = [
+          { 
+            id: 'e1-2', 
+            source: 'ai', 
+            target: 'ml', 
+            label: 'includes',
+            type: 'smoothstep',
+            style: { stroke: '#9CA3AF', strokeWidth: 2 }
+          }
+        ];
+        
+        setNodes(fallbackNodes);
+        setEdges(fallbackEdges);
+      }
+    };
+    
+    loadKnowledgeGraph();
   }, [setNodes, setEdges]);
 
   // Handle connection between nodes
