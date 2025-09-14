@@ -349,6 +349,55 @@ def continue_quiz_conversation(quiz_id):
 #     except Exception as e:
 #         return jsonify({'error': str(e)}), 500
 
+def get_all_conversations():
+    """Get all conversations with id, lastMessage, and timestamp"""
+    try:
+        conversations = []
+        
+        for session_id, session_data in sessions.items():
+            # Get the last message from conversation history
+            last_message = ""
+            timestamp = session_data.get('created_at', '')
+            
+            # Check if there are messages in the session
+            if session_data.get('messages'):
+                # Get the last message from the messages array
+                last_message_obj = session_data['messages'][-1]
+                last_message = last_message_obj.get('user_message', '')
+                timestamp = last_message_obj.get('timestamp', timestamp)
+            elif session_data.get('conversation_history'):
+                # Fallback to conversation history if no messages array
+                # Find the last user message
+                for msg in reversed(session_data['conversation_history']):
+                    if msg.get('role') == 'user':
+                        last_message = msg.get('content', '')
+                        break
+            
+            conversations.append({
+                'id': session_id,
+                'lastMessage': last_message,
+                'timestamp': timestamp
+            })
+        
+        # Sort by timestamp (most recent first)
+        conversations.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return conversations
+        
+    except Exception as e:
+        print(f"Error getting all conversations: {e}")
+        return []
+
+@app.route('/api/conversations', methods=['GET'])
+def get_all_conversations_endpoint():
+    """Get all conversations endpoint"""
+    try:
+        conversations = get_all_conversations()
+        return jsonify(conversations)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # @app.route('/api/users/<user_id>/sessions', methods=['GET'])
 # def get_user_sessions(user_id):
 #     """Get all sessions for a user"""
