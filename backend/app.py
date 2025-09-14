@@ -326,7 +326,7 @@ def create_quiz_thread():
             target_user_message,
             target_assistant_message
         )
-        quiz_questions_text = llm_service.generate_quiz_questions(target_assistant_message['message'])
+        quiz_questions_text = llm_service.generate_quiz_questions(target_assistant_message['message'], conversation_history=combined_history)
         
         # Create a single question structure from the generated text
         quiz_questions = [{
