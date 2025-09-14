@@ -5,6 +5,8 @@ import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 from llm_service import LLM
+from database import DatabaseService
+from schemas import MessageSchema
 
 # Load environment variables
 load_dotenv()
@@ -12,8 +14,14 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Initialize LLM service
+# Initialize services
 llm_service = LLM()
+try:
+    db_service = DatabaseService()
+except Exception as e:
+    print(f"Warning: Database service initialization failed: {e}")
+    print("Falling back to in-memory storage only")
+    db_service = None
 
 # In-memory storage for demo purposes (use a database in production)
 # Data structure: users -> sessions -> quizzes
@@ -21,9 +29,78 @@ users = {}  # user_id -> user_data
 sessions = {}  # session_id -> session_data  
 quizzes = {}  # quiz_id -> quizzes
 
+# Add test data
+def initialize_test_data():
+    """Initialize test data for development and testing"""
+    global users, sessions, quizzes
+    
+    # Test user
+    users['1'] = {
+        'id': '1',
+        'username': 'alice',
+        'created_at': '2024-01-15T10:30:00',
+        'sessions': ['session1', 'session2']
+    }
+    
+    # Test sessions
+    sessions['session1'] = {
+        'id': 'session1',
+        'user_id': '1',
+        'created_at': '2024-01-15T10:30:00',
+        'title': 'React component',
+        'messages': [
+            {
+                'message_id': 'msg1_user',
+                'message': 'How to create a button component?',
+                'role': 'user',
+                'timestamp': '2024-01-15T10:30:00'
+            },
+            {
+                'message_id': 'msg1_assistant',
+                'message': 'Here is how to create a button component...',
+                'role': 'assistant',
+                'timestamp': '2024-01-15T10:30:01'
+            }
+        ],
+        'quizzes': [],
+        'conversation_history': [
+            {"role": "user", "content": "How to create a button component?"},
+            {"role": "assistant", "content": "Here is how to create a button component..."}
+        ]
+    }
+    
+    sessions['session2'] = {
+        'id': 'session2',
+        'user_id': '1', 
+        'created_at': '2024-01-14T15:45:00',
+        'title': 'JavaScript patterns',
+        'messages': [
+            {
+                'message_id': 'msg2_user',
+                'message': 'What are async/await best practices?',
+                'role': 'user',
+                'timestamp': '2024-01-14T15:45:00'
+            },
+            {
+                'message_id': 'msg2_assistant',
+                'message': 'Async/await best practices include...',
+                'role': 'assistant',
+                'timestamp': '2024-01-14T15:45:01'
+            }
+        ],
+        'quizzes': [],
+        'conversation_history': [
+            {"role": "user", "content": "What are async/await best practices?"},
+            {"role": "assistant", "content": "Async/await best practices include..."}
+        ]
+    }
+
+# Initialize test data
+initialize_test_data()
+
 @app.route('/api/users', methods=['POST'])
 def create_user():
-    """Create a new user"""
+    """Create a new user (legacy endpoint)"""
     try:
         data = request.get_json()
         username = data.get('username', '')
@@ -31,25 +108,37 @@ def create_user():
         if not username:
             return jsonify({'error': 'Username is required'}), 400
         
-        # Check if username already exists
-        for user_id, user_data in users.items():
-            if user_data.get('username') == username:
+        # Use MongoDB if available
+        if db_service and db_service.is_connected():
+            user_id = db_service.create_user(username=username)
+            if not user_id:
                 return jsonify({'error': 'Username already exists'}), 409
-        
-        # Create new user
-        user_id = str(uuid.uuid4())
-        users[user_id] = {
-            'id': user_id,
-            'username': username,
-            'created_at': datetime.now().isoformat(),
-            'sessions': []
-        }
-        
-        return jsonify({
-            'user_id': user_id,
-            'username': username,
-            'created_at': users[user_id]['created_at']
-        })
+            
+            user = db_service.get_user(user_id)
+            return jsonify({
+                'user_id': user_id,
+                'username': user['username'],
+                'created_at': user['created_at']
+            })
+        else:
+            # Fallback to in-memory storage
+            for user_id, user_data in users.items():
+                if user_data.get('username') == username:
+                    return jsonify({'error': 'Username already exists'}), 409
+            
+            user_id = str(uuid.uuid4())
+            users[user_id] = {
+                'id': user_id,
+                'username': username,
+                'created_at': datetime.now().isoformat(),
+                'sessions': []
+            }
+            
+            return jsonify({
+                'user_id': user_id,
+                'username': username,
+                'created_at': users[user_id]['created_at']
+            })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -335,52 +424,37 @@ def continue_quiz_conversation(quiz_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# @app.route('/api/session/<session_id>', methods=['GET'])
-# def get_session(session_id):
-#     """Get session history"""
-#     try:
-#         if session_id not in sessions:
-#             return jsonify({'error': 'Session not found'}), 404
-        
-#         session = sessions[session_id]
-#         session_quizzes = []
-        
-#         for quiz_id in session['quizzes']:
-#             if quiz_id in quizzes:
-#                 quiz = quizzes[quiz_id]
-#                 session_quizzes.append({
-#                     'quiz_id': quiz_id,
-#                     'completed': quiz['completed']
-#                 })
-        
-#         return jsonify({
-#             'session_id': session_id,
-#             'user_id': session['user_id'],
-#             'created_at': session['created_at'],
-#             'messages': session['messages'],
-#             'quizzes': session_quizzes
-#         })
-        
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
-
-def get_all_conversations():
-    """Get all conversations with id, lastMessage, and timestamp"""
+def get_all_conversations(user_id):
+    """Get all conversations for a specific user with id, lastMessage, and timestamp"""
     try:
         conversations = []
         
-        for session_id, session_data in sessions.items():
+        # Get user's sessions directly
+        if user_id not in users:
+            return []
+            
+        user_sessions = users[user_id].get('sessions', [])
+        
+        for session_id in user_sessions:
+            if session_id not in sessions:
+                continue
+                
+            session_data = sessions[session_id]
+            
             # Get the last message from conversation history
             last_message = ""
             timestamp = session_data.get('created_at', '')
             
             # Check if there are messages in the session
-            if session_data.get('messages'):
-                # Get the last message from the messages array
-                last_message_obj = session_data['messages'][-1]
-                last_message = last_message_obj.get('user_message', '')
-                timestamp = last_message_obj.get('timestamp', timestamp)
-            elif session_data.get('conversation_history'):
+            if session_data.get('messages') and len(session_data['messages']) > 0:
+                # Find the last user message from the messages array
+                for i in range(len(session_data['messages']) - 1, -1, -1):
+                    msg = session_data['messages'][i]
+                    if msg.get('role') == 'user':
+                        last_message = msg.get('message', '')
+                        timestamp = msg.get('timestamp', timestamp)
+                        break
+            elif session_data.get('conversation_history') and len(session_data['conversation_history']) > 0:
                 # Fallback to conversation history if no messages array
                 # Find the last user message
                 for msg in reversed(session_data['conversation_history']):
@@ -390,8 +464,9 @@ def get_all_conversations():
             
             conversations.append({
                 'id': session_id,
+                'title': session_data.get('title', ''),
                 'lastMessage': last_message,
-                'timestamp': timestamp
+                'timestamp': timestamp,
             })
         
         # Sort by timestamp (most recent first)
@@ -400,47 +475,64 @@ def get_all_conversations():
         return conversations
         
     except Exception as e:
-        print(f"Error getting all conversations: {e}")
+        print(f"Error getting conversations for user {user_id}: {e}")
         return []
 
-@app.route('/api/conversations', methods=['GET'])
-def get_all_conversations_endpoint():
-    """Get all conversations endpoint"""
+@app.route('/api/users/<user_id>/conversations', methods=['GET'])
+def get_all_conversations_endpoint(user_id):
+    """Get all conversations for a specific user"""
     try:
-        conversations = get_all_conversations()
+        if user_id not in users:
+            return jsonify({'error': 'User not found'}), 404
+            
+        conversations = get_all_conversations(user_id)
         return jsonify(conversations)
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# @app.route('/api/users/<user_id>/sessions', methods=['GET'])
-# def get_user_sessions(user_id):
-#     """Get all sessions for a user"""
-#     try:
-#         if user_id not in users:
-#             return jsonify({'error': 'User not found'}), 404
+def get_conversation_messages(conv_id):
+    """Get all messages for a specific conversation/session"""
+    try:
+        if conv_id not in sessions:
+            return []
+            
+        session_data = sessions[conv_id]
+        messages = []
         
-#         user = users[user_id]
-#         user_sessions = []
+        # Get messages from the session's messages array
+        if session_data.get('messages') and len(session_data['messages']) > 0:
+            for msg in session_data['messages']:
+                # Each message is already a single message with the new structure
+                messages.append({
+                    'id': msg['message_id'],
+                    'content': msg['message'],
+                    'role': msg['role'],
+                    'timestamp': msg['timestamp'],
+                    'conversationId': conv_id
+                })
         
-#         for session_id in user['sessions']:
-#             if session_id in sessions:
-#                 session = sessions[session_id]
-#                 user_sessions.append({
-#                     'session_id': session_id,
-#                     'created_at': session['created_at'],
-#                     'message_count': len(session['messages']),
-#                     'quiz_count': len(session['quizzes'])
-#                 })
+        # Sort messages by timestamp
+        messages.sort(key=lambda x: x['timestamp'])
         
-#         return jsonify({
-#             'user_id': user_id,
-#             'username': user['username'],
-#             'sessions': user_sessions
-#         })
+        return messages
         
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Error getting conversation messages for {conv_id}: {e}")
+        return []
+
+@app.route('/api/conversations/<conv_id>/messages', methods=['GET'])
+def get_conversation_messages_endpoint(conv_id):
+    """Get all messages for a specific conversation/session"""
+    try:
+        if conv_id not in sessions:
+            return jsonify({'error': 'Conversation not found'}), 404
+            
+        messages = get_conversation_messages(conv_id)
+        return jsonify(messages)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
