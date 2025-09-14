@@ -155,7 +155,13 @@ export const useStore = create<StoreState>((set, get) => ({
       const messages = await response.json();
       
       // Transform the API response to match our Message interface
-      const transformedMessages = messages.map((msg: any) => ({
+      const transformedMessages = messages.map((msg: {
+        id: string | number;
+        content?: string;
+        role?: 'user' | 'assistant';
+        timestamp: string | Date;
+        conversationId: string;
+      }) => ({
         id: msg.id.toString(),
         content: msg.content || '',
         role: msg.role || 'user',
