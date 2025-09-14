@@ -16,13 +16,13 @@ class LLM():
         self.cerebras_client = Cerebras(
             api_key=os.environ.get("CEREBRAS_API_KEY")
         )
-        self.default_anthropic_model = 'claude-3-haiku-20240307'
+        self.default_anthropic_model = 'claude-sonnet-4-20250514'
         self.anthropic_client = anthropic.Anthropic(
             api_key=os.environ.get("CLAUDE_API_KEY")
         )
         self.max_tokens=1000
     
-    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'cerebras', system_prompt: str = None):
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'claude', system_prompt: str = None):
         """
         Get response from Cerebras API for a given message with conversation context
         
@@ -43,7 +43,7 @@ class LLM():
 
         elif model_type == 'claude' or model_type == 'anthropic':
             if not self.anthropic_client.api_key:
-                yield "Error: CEREBRAS_API_KEY not configured"
+                yield "Error: CLAUDE_API_KEY not configured"
             
             model = model or self.default_anthropic_model
         
@@ -52,6 +52,7 @@ class LLM():
             messages.extend(conversation_history)
         
         messages.append({"role": "user", "content": message})
+        print(messages)
         
         try:
             if model_type == 'cerebras':
@@ -69,7 +70,7 @@ class LLM():
                     max_tokens=self.max_tokens,
                     messages=messages,
                     model=model,
-                    system=system_prompt
+                    system=system_prompt or "You are a helpful AI assistant."
                 ) as stream:
                     for chunk in stream.text_stream:
                         if chunk: 

@@ -87,7 +87,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     setIsLoading(true);
 
     try {
-      // Send message to backend
+      // Send message to backend with streaming
       const response = await fetch('http://localhost:5000/api/chat', {
         method: 'POST',
         headers: {
@@ -103,23 +103,59 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
         throw new Error('Failed to send message');
       }
 
-      const data = await response.json();
-      
-      // Create assistant message from backend response
-      const assistantMessage: Message = {
-        id: data.chatbot_message_id || (Date.now() + 1).toString(),
-        content: data.chat_response,
-        role: 'assistant',
-        timestamp: new Date(),
-        conversationId: selectedConversationId,
-      };
-      
-      addMessage(assistantMessage);
-      updateConversationLastMessage(selectedConversationId, assistantMessage.content);
-      
-      // Update conversation title if it was generated
-      if (data.title && data.title !== 'New conversation') {
-        useStore.getState().updateConversation(selectedConversationId, { title: data.title });
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantMessageId = '';
+      let fullResponse = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.status === 'started') {
+                  // Create initial assistant message
+                  assistantMessageId = data.user_message_id + '_assistant';
+                  const assistantMessage: Message = {
+                    id: assistantMessageId,
+                    content: '',
+                    role: 'assistant',
+                    timestamp: new Date(),
+                    conversationId: selectedConversationId,
+                  };
+                  addMessage(assistantMessage);
+                } else if (data.status === 'chunk') {
+                  // Stream content to the assistant message
+                  fullResponse += data.content;
+                  useStore.getState().updateMessageContent(assistantMessageId, fullResponse);
+                  updateConversationLastMessage(selectedConversationId, fullResponse);
+                } else if (data.status === 'completed') {
+                  // Finalize the message
+                  assistantMessageId = data.chatbot_message_id;
+                  useStore.getState().updateMessageId(assistantMessageId, data.chatbot_message_id);
+                  
+                  // Update conversation title if it was generated
+                  if (data.title && data.title !== 'New conversation') {
+                    useStore.getState().updateConversation(selectedConversationId, { title: data.title });
+                  }
+                } else if (data.status === 'error') {
+                  throw new Error(data.error);
+                }
+              } catch (parseError) {
+                console.error('Error parsing SSE data:', parseError);
+              }
+            }
+          }
+        }
       }
       
     } catch (error) {

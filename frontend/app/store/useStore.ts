@@ -43,6 +43,8 @@ interface StoreState {
   createThreadForMessage: (message: Message, userId: string) => Promise<Conversation>;
   
   addMessage: (message: Message) => void;
+  updateMessageContent: (messageId: string, content: string) => void;
+  updateMessageId: (oldMessageId: string, newMessageId: string) => void;
   setMessagesForConversation: (conversationId: string, messages: Message[]) => void;
   getMessagesForConversation: (conversationId: string) => Message[];
   updateConversationLastMessage: (conversationId: string, lastMessage: string) => void;
@@ -339,6 +341,36 @@ export const useStore = create<StoreState>((set, get) => ({
           message
         ]
       }
+    }));
+  },
+
+  updateMessageContent: (messageId, content) => {
+    set((state) => ({
+      messagesByConversation: Object.fromEntries(
+        Object.entries(state.messagesByConversation).map(([convId, messages]) => [
+          convId,
+          messages.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, content }
+              : msg
+          )
+        ])
+      )
+    }));
+  },
+
+  updateMessageId: (oldMessageId, newMessageId) => {
+    set((state) => ({
+      messagesByConversation: Object.fromEntries(
+        Object.entries(state.messagesByConversation).map(([convId, messages]) => [
+          convId,
+          messages.map(msg => 
+            msg.id === oldMessageId 
+              ? { ...msg, id: newMessageId }
+              : msg
+          )
+        ])
+      )
     }));
   },
 
