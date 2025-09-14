@@ -354,7 +354,7 @@ def create_quiz_thread(session_id):
         if not start_user_message or not start_assistant_message:
             return jsonify({'error': 'Start messages not found'}), 404
 
-        prev_context = combine_session_and_quiz_history(messages, start_user_message)
+        prev_context = combine_session_and_quiz_history(messages, start_user_message, sessions[session_id]['conversation_history'])
         
         # Create new quiz thread
         quiz_id = str(uuid.uuid4())
