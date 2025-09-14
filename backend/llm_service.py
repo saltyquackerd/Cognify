@@ -3,7 +3,6 @@ import os
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from cerebras.cloud.sdk import Cerebras
-import anthropic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,13 +15,9 @@ class LLM():
         self.cerebras_client = Cerebras(
             api_key=os.environ.get("CEREBRAS_API_KEY")
         )
-        self.default_anthropic_model = 'claude-sonnet-4-20250514'
-        self.anthropic_client = anthropic.Anthropic(
-            api_key=os.environ.get("CLAUDE_API_KEY")
-        )
         self.max_tokens=1000
     
-    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, model_type: str = 'cerebras', system_prompt: str = None, isStreaming : bool = True):
+    def get_chat_response(self, message: str, conversation_history: List[Dict] = None, model: str = None, system_prompt: str = None, isStreaming : bool = True):
         """
         Get response from Cerebras API for a given message with conversation context
         
@@ -30,24 +25,21 @@ class LLM():
             message (str): User's message/query
             conversation_history (List[Dict], optional): Previous conversation messages
             model (str, optional): Model to use (see Cerebras API). Defaults to default_model
+            system_prompt (str, optional): System prompt for the conversation
+            isStreaming (bool): Whether to stream the response
             
         Returns:
             str: AI response or error message
         """
         
-        if model_type == 'cerebras':
-            if not self.cerebras_client.api_key:
-                yield "Error: CEREBRAS_API_KEY not configured"
-            
-            model = model or self.default_cerebras_model
-
-        elif model_type == 'claude' or model_type == 'anthropic':
-            if not self.anthropic_client.api_key:
-                yield "Error: CLAUDE_API_KEY not configured"
-            
-            model = model or self.default_anthropic_model
+        if not self.cerebras_client.api_key:
+            yield "Error: CEREBRAS_API_KEY not configured"
+        
+        model = model or self.default_cerebras_model
         
         messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
         if conversation_history:
             messages.extend(conversation_history)
         
@@ -55,43 +47,22 @@ class LLM():
         print(messages)
         
         try:
-            if model_type == 'cerebras':
-                if isStreaming:
-                    stream = self.cerebras_client.chat.completions.create(
-                        messages=messages,
-                        model=model,
-                        stream=True
-                    )
-                    for chunk in stream:
-                        if chunk.choices[0].delta.content:
-                            yield chunk.choices[0].delta.content
-                else:
-                    return self.cerebras_client.chat.completions.create(
-                        messages=messages,
-                        model=model,
-                        stream=False
-                    )
-
-            elif model_type == 'anthropic' or model_type == 'claude':
-                system_prompt = system_prompt or 'You are a helpful AI Assistant.'
-                if isStreaming:
-                    with self.anthropic_client.messages.stream(
-                        max_tokens=self.max_tokens,
-                        messages=messages,
-                        model=model,
-                        system=system_prompt
-                    ) as stream:
-                        for chunk in stream.text_stream:
-                            if chunk: 
-                                yield chunk
-                else:
-                    return self.anthropic_client.messages.create(max_tokens=self.max_tokens,
-                        messages=messages,
-                        model=model,
-                        system=system_prompt
-                    )
+            if isStreaming:
+                stream = self.cerebras_client.chat.completions.create(
+                    messages=messages,
+                    model=model,
+                    stream=True
+                )
+                for chunk in stream:
+                    if chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
             else:
-                yield f'Error: Cerebras or Anthropic model type expected.'
+                response = self.cerebras_client.chat.completions.create(
+                    messages=messages,
+                    model=model,
+                    stream=False
+                )
+                return response.choices[0].message.content
             
         except requests.exceptions.RequestException as e:
             yield f"Error communicating with Cerebras API: {str(e)}"
@@ -119,7 +90,7 @@ class LLM():
         user_prompt = f"""CONTEXT:
                         {response_text}
 
-                        HIGHTLIGHTS:
+                        HIGHLIGHTS:
                         {user_highlight or ""}
 
                         Requirements:
@@ -130,7 +101,7 @@ class LLM():
 
         conversation.append({"role": "user", "content": user_prompt})
 
-        return self.get_chat_response(user_prompt, conversation_history = conversation, model_type = 'claude', system_prompt = system_prompt, isStreaming=False)
+        return self.get_chat_response(user_prompt, conversation_history = conversation, system_prompt = system_prompt, isStreaming=False)
     
     def evaluate_answer(self, conversation_history : List[Dict]):
         """
@@ -151,7 +122,7 @@ class LLM():
         if conversation_history is None:
             return f"Error: Conversation history (assistant question and user answer) expected"
         
-        return self.get_chat_response(prompt, conversation_history = conversation_history, model_type = 'claude', system_prompt = prompt, isStreaming=False)
+        return self.get_chat_response(prompt, conversation_history = conversation_history, system_prompt = prompt, isStreaming=False)
 
     def get_title(self, response : str):
         """
@@ -210,14 +181,11 @@ def main():
     print(' == QUIZ QUESTION == ')
     user_highlight = 'priority queue'
     user_highlight = None
-    quiz_gen = llm.generate_quiz_questions(response, user_highlight, history)
-    response = ''
-    for s in quiz_gen:
-        response += s
-        print(s, end='',flush=True)
+    quiz_response = llm.generate_quiz_questions(response, user_highlight, history)
+    print(quiz_response)
     print()
     
-    history.append({'role':'assistant','content':response})
+    history.append({'role':'assistant','content':quiz_response})
 
     # TEST 3.1: ASK MULTIPLE QUESTIONS OF SAME TOPIC
     # for i in range(5):
@@ -237,11 +205,10 @@ def main():
 
     for answer in answers:
         history.append({'role':'user','content':answer})
-        eval_gen = llm.evaluate_answer(history)
+        eval_response = llm.evaluate_answer(history)
         print('== EVALUATION FOR ANSWER:', answer, "== ")
         print()
-        for s in eval_gen:
-            print(s, end='',flush=True)
+        print(eval_response)
         history.pop()
         print()
     
