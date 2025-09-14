@@ -107,7 +107,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       
       if (Array.isArray(data) && data.length > 0) {
         // Convert backend messages to frontend Message format
-        const messages: Message[] = data.map((msg: { id: string; content: string; role: string; timestamp: string }) => ({
+        const messages: Message[] = data.map((msg: { id: string; content: string; role: 'user' | 'assistant'; timestamp: string }) => ({
           id: msg.id,
           content: msg.content,
           role: msg.role,
