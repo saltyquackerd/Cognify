@@ -53,6 +53,27 @@ const nodeTypes = {
   customNode: CustomNode,
 };
 
+// Helper function to assign colors to nodes based on topic
+const getNodeColor = (topic: string): string => {
+  const colors = [
+    '#E0E7FF', // Light blue
+    '#D1FAE5', // Light green
+    '#F3E8FF', // Light purple
+    '#FEF3C7', // Light yellow
+    '#FED7D7', // Light red
+    '#E6FFFA', // Light teal
+    '#FFF5F5', // Light pink
+    '#F0FDF4', // Light lime
+  ];
+  
+  // Simple hash function to consistently assign colors
+  let hash = 0;
+  for (let i = 0; i < topic.length; i++) {
+    hash = topic.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export default function KnowledgeGraphPage() {
   const router = useRouter();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -63,42 +84,74 @@ export default function KnowledgeGraphPage() {
   useEffect(() => {
     const loadKnowledgeGraph = async () => {
       try {
-        // Replace with your actual API endpoint
-        const response = await fetch('/api/knowledge-graph');
+        // Call your backend API endpoint
+        const response = await fetch('http://localhost:5000/api/knowledge-graph');
         
         if (!response.ok) {
           throw new Error('Failed to fetch knowledge graph data');
         }
         
         const data = await response.json();
+        console.log('Knowledge graph API response:', data);
         
-        // Transform API data to React Flow format if needed
-        const transformedNodes = data.nodes?.map((node: any) => ({
-          id: node.id,
-          type: 'customNode',
-          position: { x: node.x || Math.random() * 800, y: node.y || Math.random() * 600 },
-          data: {
-            label: node.label,
-            color: node.color || '#E0E7FF',
-            textColor: node.textColor || '#374151',
-            category: node.category || 'Concept'
-          }
-        })) || [];
+        // Transform API data to React Flow format
+        // Backend returns: { topics: [...], edges: [[source, target], ...] }
+        const topics = data.topics || [];
+        const edgeList = data.edges || [];
         
-        const transformedEdges = data.edges?.map((edge: any, index: number) => ({
-          id: edge.id || `edge-${index}`,
-          source: edge.source,
-          target: edge.target,
-          label: edge.label,
-          type: 'smoothstep',
-          animated: edge.animated || false,
+        // Calculate node degrees (number of connections)
+        const nodeDegrees = new Map<string, number>();
+        topics.forEach((topic: string) => nodeDegrees.set(topic, 0));
+        edgeList.forEach(([source, target]: [string, string]) => {
+          nodeDegrees.set(source, (nodeDegrees.get(source) || 0) + 1);
+          nodeDegrees.set(target, (nodeDegrees.get(target) || 0) + 1);
+        });
+
+        // Create nodes with force-directed positioning
+        const transformedNodes = topics.map((topic: string) => {
+          const degree = nodeDegrees.get(topic) || 0;
+          const maxDegree = Math.max(...Array.from(nodeDegrees.values()));
+          
+          // Nodes with higher degree get positioned closer to center
+          const centralityFactor = maxDegree > 0 ? degree / maxDegree : 0;
+          const baseRadius = 150 + (1 - centralityFactor) * 200; // High degree = smaller radius
+          
+          // Add randomization
+          const angle = Math.random() * 2 * Math.PI;
+          const radiusVariation = (Math.random() - 0.5) * 100;
+          const finalRadius = Math.max(50, baseRadius + radiusVariation);
+          
+          const x = 400 + finalRadius * Math.cos(angle);
+          const y = 300 + finalRadius * Math.sin(angle);
+          
+          return {
+            id: topic,
+            type: 'customNode',
+            position: { x, y },
+            data: {
+              label: topic,
+              color: getNodeColor(topic),
+              textColor: '#374151',
+              category: `Topic (${degree} connections)`,
+              originalColor: getNodeColor(topic)
+            }
+          };
+        });
+        
+        // Create edges from edge list
+        const transformedEdges = edgeList.map((edge: [string, string], index: number) => ({
+          id: `edge-${index}`,
+          source: edge[0],
+          target: edge[1],
+          type: 'straight',
+          animated: false,
           style: {
-            stroke: edge.color || '#9CA3AF',
-            strokeWidth: edge.width || 2,
-            strokeDasharray: edge.dashed ? '5,5' : '0'
+            stroke: '#9CA3AF',
+            strokeWidth: 2,
+            opacity: 1
           },
           labelStyle: { fill: '#6B7280', fontWeight: 500 }
-        })) || [];
+        }));
         
         setNodes(transformedNodes);
         setEdges(transformedEdges);
@@ -157,10 +210,88 @@ export default function KnowledgeGraphPage() {
     [setEdges]
   );
 
-  // Handle node selection
+  // Handle node selection and highlighting
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
-  }, []);
+    
+    // Get connected node IDs
+    const connectedNodeIds = new Set<string>();
+    const connectedEdgeIds = new Set<string>();
+    
+    edges.forEach(edge => {
+      if (edge.source === node.id || edge.target === node.id) {
+        connectedEdgeIds.add(edge.id);
+        connectedNodeIds.add(edge.source === node.id ? edge.target : edge.source);
+      }
+    });
+    
+    // Update nodes with highlighting
+    setNodes(currentNodes => 
+      currentNodes.map(n => ({
+        ...n,
+        data: {
+          ...n.data,
+          color: n.id === node.id 
+            ? '#3B82F6' // Blue for selected node
+            : connectedNodeIds.has(n.id)
+            ? '#10B981' // Green for connected nodes
+            : n.data.originalColor, // Dim unconnected nodes
+          textColor: n.id === node.id || connectedNodeIds.has(n.id) 
+            ? '#FFFFFF' 
+            : '#9CA3AF'
+        },
+        style: {
+          opacity: n.id === node.id || connectedNodeIds.has(n.id) ? 1 : 0.3
+        }
+      }))
+    );
+    
+    // Update edges with highlighting
+    setEdges(currentEdges =>
+      currentEdges.map(e => ({
+        ...e,
+        style: {
+          ...e.style,
+          stroke: connectedEdgeIds.has(e.id) ? '#3B82F6' : '#9CA3AF',
+          strokeWidth: connectedEdgeIds.has(e.id) ? 3 : 2,
+          opacity: connectedEdgeIds.has(e.id) ? 1 : 0.2
+        }
+      }))
+    );
+  }, [edges, setNodes, setEdges]);
+
+  // Handle clearing selection when clicking on empty space
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
+    
+    // Reset all nodes to original colors
+    setNodes(currentNodes => 
+      currentNodes.map(n => ({
+        ...n,
+        data: {
+          ...n.data,
+          color: n.data.originalColor,
+          textColor: '#374151'
+        },
+        style: {
+          opacity: 1
+        }
+      }))
+    );
+    
+    // Reset all edges to original styles
+    setEdges(currentEdges =>
+      currentEdges.map(e => ({
+        ...e,
+        style: {
+          ...e.style,
+          stroke: '#9CA3AF',
+          strokeWidth: 2,
+          opacity: 1
+        }
+      }))
+    );
+  }, [setNodes, setEdges]);
 
   // Handle adding new nodes
   const onAddNode = useCallback(() => {
@@ -172,7 +303,8 @@ export default function KnowledgeGraphPage() {
         label: 'New Concept',
         color: '#F3E8FF',
         textColor: '#6B21A8',
-        category: 'Custom'
+        category: 'Custom',
+        originalColor: '#F3E8FF'
       }
     };
     setNodes((nds) => [...nds, newNode]);
@@ -296,6 +428,7 @@ export default function KnowledgeGraphPage() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             connectionMode={ConnectionMode.Loose}
             fitView
