@@ -21,7 +21,9 @@ interface SidePopupProps {
 }
 
 export default function SidePopup({ isOpen, onClose, initialMessage, title = "Continue Chat", onWidthChange, messageId }: SidePopupProps) {
-  const { getQuizForMessage, createQuizForMessage, selectedConversationId } = useStore();
+  const { selectedConversationId } = useStore();
+  // Subscribe to the specific quiz id for this message so changes trigger re-render
+  const quizConversationId = useStore((state) => (messageId ? state.messageQuizMap[messageId] : null));
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,33 +32,33 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
   const [isResizing, setIsResizing] = useState(false);
   const [hasQuiz, setHasQuiz] = useState(false);
   const [askedInitial, setAskedInitial] = useState(false);
-  const [isCreatingThread, setIsCreatingThread] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
 
   // Ensure quiz exists and ask initial question
   useEffect(() => {
-    if (messageId) {
-      const quizConversationId = getQuizForMessage(messageId);
-      if (quizConversationId) {
-        setHasQuiz(true);
-        if (!askedInitial) {
-          // Ask the first question automatically
-          (async () => {
-            try {
-              await askQuestion(quizConversationId);
-              setAskedInitial(true);
-            } catch (e) {
-              console.error(e);
-            }
-          })();
-        }
-      } else {
-        // No quiz exists yet; show nothing until user creates
-        setHasQuiz(false);
-        setAskedInitial(false);
+    console.log('SidePopup useEffect - messageId:', messageId);
+    console.log('SidePopup useEffect - quizConversationId:', quizConversationId);
+    if (!messageId) return;
+    if (quizConversationId) {
+      console.log('Quiz exists, setting hasQuiz to true');
+      setHasQuiz(true);
+      if (!askedInitial) {
+        console.log('Asking initial question');
+        (async () => {
+          try {
+            await askQuestion(quizConversationId);
+            setAskedInitial(true);
+          } catch (e) {
+            console.error('Error asking initial question:', e);
+          }
+        })();
       }
+    } else {
+      console.log('No quiz exists yet, setting hasQuiz to false');
+      setHasQuiz(false);
+      setAskedInitial(false);
     }
-  }, [messageId, getQuizForMessage, askedInitial]);
+  }, [messageId, quizConversationId, askedInitial]);
 
   const askQuestion = async (quizId: string) => {
     const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/ask-question`, {
@@ -77,30 +79,6 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     setMessages(prev => [...prev, questionMessage]);
   };
 
-  const handleCreateQuizThread = async () => {
-    if (!messageId || !selectedConversationId || isCreatingThread) return;
-    
-    setIsCreatingThread(true);
-    try {
-      // Create quiz conversation (non-streaming backend)
-      const quizConv = await createQuizForMessage({
-        id: messageId,
-        content: initialMessage,
-        role: 'assistant',
-        timestamp: new Date(),
-        conversationId: selectedConversationId
-      }, '1');
-      
-      setHasQuiz(true);
-      setMessages([]);
-      setAskedInitial(true);
-      await askQuestion(quizConv.id);
-    } catch (error) {
-      console.error('Failed to create quiz thread:', error);
-    } finally {
-      setIsCreatingThread(false);
-    }
-  };
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
@@ -164,23 +142,13 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
     setIsLoading(true);
 
     try {
-      // Get or create quiz conversation
-      let threadConversationId = getQuizForMessage(messageId);
-      
-      if (!threadConversationId) {
-        // Create a new quiz conversation (without selecting it)
-        const threadConv = await createQuizForMessage({
-          id: messageId,
-          content: initialMessage,
-          role: 'assistant',
-          timestamp: new Date(),
-          conversationId: selectedConversationId || ''
-        }, '1');
-        threadConversationId = threadConv.id;
+      // Quiz should already exist when popup opens
+      if (!quizConversationId) {
+        throw new Error('No quiz found for this message');
       }
 
       // For quiz, send answers to the non-streaming endpoint
-      const quizId = threadConversationId;
+      const quizId = quizConversationId;
       const response = await fetch(`http://localhost:5000/api/quiz/${quizId}/answer`, {
         method: 'POST',
         headers: {
@@ -234,16 +202,6 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
             {title} - Fullscreen
           </h2>
           <div className="flex items-center space-x-2">
-            {!hasQuiz && messageId && (
-              <button
-                onClick={handleCreateQuizThread}
-                disabled={isCreatingThread}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Create quiz thread for this message"
-              >
-                {isCreatingThread ? 'Creating...' : 'Create Quiz'}
-              </button>
-            )}
             <button
               onClick={toggleFullscreen}
               className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600"
@@ -331,16 +289,6 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
           {title}
         </h2>
         <div className="flex items-center space-x-2">
-          {!hasQuiz && messageId && (
-            <button
-              onClick={handleCreateQuizThread}
-              disabled={isCreatingThread}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Create quiz thread for this message"
-            >
-              {isCreatingThread ? 'Creating...' : 'Create Quiz'}
-            </button>
-          )}
           <button
             onClick={toggleFullscreen}
             className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -409,7 +357,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
           <button
             onClick={() => {
               if (!messageId) return;
-              const quizId = getQuizForMessage(messageId);
+              const quizId = quizConversationId;
               if (quizId) {
                 askQuestion(quizId);
               }
