@@ -247,6 +247,43 @@ def chat():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def combine_session_and_quiz_history(session_messages, target_user_message, target_assistant_message, quiz_history=None):
+    """
+    Combine session history up to the quiz point and add quiz history without overlap.
+    
+    Args:
+        session_messages: List of messages from the session (with message_id)
+        target_user_message: The user message that triggered the quiz
+        target_assistant_message: The assistant message that the quiz is based on
+        quiz_history: Optional existing quiz conversation history
+    
+    Returns:
+        List of combined conversation history without overlap
+    """
+    combined_history = []
+    
+    # Find the index of the target user message in session messages by message_id
+    target_user_index = -1
+    for i, msg in enumerate(session_messages):
+        if msg.get('message_id') == target_user_message['message_id'] and msg.get('role') == 'user':
+            target_user_index = i
+            break
+    
+    # Convert session messages to conversation history format before target user message
+    if target_user_index > 0:
+        for i in range(target_user_index):
+            msg = session_messages[i]
+            combined_history.append({
+                "role": msg['role'],
+                "content": msg['message']
+            })
+    
+    # Add the quiz history
+    if quiz_history is not None:
+        combined_history.extend(quiz_history)
+    
+    return combined_history
+
 @app.route('/api/create-quiz-thread', methods=['POST'])
 def create_quiz_thread():
     """Create a quiz thread from a specific chat response"""
@@ -284,6 +321,11 @@ def create_quiz_thread():
             return jsonify({'error': 'Corresponding user message not found'}), 404
         
         # Generate quiz questions from the specific response
+        combined_history = combine_session_and_quiz_history(
+            sessions[session_id]['messages'],
+            target_user_message,
+            target_assistant_message
+        )
         quiz_questions_text = llm_service.generate_quiz_questions(target_assistant_message['message'])
         
         # Create a single question structure from the generated text
