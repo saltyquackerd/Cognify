@@ -126,7 +126,12 @@ export const useStore = create<StoreState>((set, get) => ({
       const conversations = await response.json();
       
       // Transform the API response to match our Conversation interface
-      const transformedConversations = conversations.map((conv: any) => ({
+      const transformedConversations = conversations.map((conv: {
+        id: string | number;
+        title?: string;
+        lastMessage?: string;
+        timestamp: string | Date;
+      }) => ({
         id: conv.id.toString(),
         title: conv.title || 'Untitled Conversation',
         lastMessage: conv.lastMessage || '',
@@ -308,7 +313,7 @@ export const useStore = create<StoreState>((set, get) => ({
       };
       
       // Add quiz questions as assistant messages
-      const quizMessages: Message[] = quizData.quiz_questions.map((q: any, index: number) => ({
+      const quizMessages: Message[] = quizData.quiz_questions.map((q: { question: string }, index: number) => ({
         id: `${quizData.quiz_id}-quiz-${index}`,
         content: `Q${index + 1}: ${q.question}`,
         role: 'assistant' as const,
