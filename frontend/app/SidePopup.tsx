@@ -112,16 +112,16 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
 
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
+      <div className="fixed inset-0 z-50 bg-white flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
             {title} - Fullscreen
           </h2>
           <div className="flex items-center space-x-2">
             <button
               onClick={toggleFullscreen}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600"
               title="Exit fullscreen"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -130,7 +130,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
             </button>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -152,7 +152,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
                 className={`max-w-[70%] rounded-2xl px-4 py-3 ${
                   message.role === 'user'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                    : 'bg-gray-100 text-gray-900'
                 }`}
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -164,7 +164,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
           
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-3">
+              <div className="bg-gray-100 rounded-2xl px-4 py-3">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -176,7 +176,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
         </div>
 
         {/* Input Field */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+        <div className="border-t border-gray-200 p-6">
           <InputField
             onSendMessage={handleSendMessage}
             disabled={isLoading}
@@ -191,18 +191,18 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
   return (
     <div 
       ref={resizeRef}
-      className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full flex-shrink-0 relative"
+      className="bg-white border-l border-gray-200 flex flex-col h-full flex-shrink-0 relative"
       style={{ width: `${width}px` }}
     >
       {/* Resize Handle */}
       <div
-        className="absolute left-0 top-0 w-1 h-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-500 cursor-col-resize z-10 opacity-30 hover:opacity-100 transition-opacity duration-200"
+        className="absolute left-0 top-0 w-1 h-full bg-gray-200 hover:bg-gray-400 cursor-col-resize z-10 opacity-30 hover:opacity-100 transition-opacity duration-200"
         onMouseDown={handleMouseDown}
       />
       
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900">
           {title}
         </h2>
         <div className="flex items-center space-x-2">
@@ -239,7 +239,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
               className={`max-w-[80%] rounded-2xl px-3 py-2 ${
                 message.role === 'user'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                  : 'bg-gray-100 text-gray-900'
               }`}
             >
               <p className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -251,7 +251,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
         
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-3 py-2">
+            <div className="bg-gray-100 rounded-2xl px-3 py-2">
               <div className="flex space-x-1">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -263,7 +263,7 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
       </div>
 
       {/* Input Field */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+      <div className="border-t border-gray-200 p-4">
         <InputField
           onSendMessage={handleSendMessage}
           disabled={isLoading}

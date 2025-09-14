@@ -95,7 +95,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   loadConversations: async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${userId}/conversations`);
+      const response = await fetch(`http://localhost:5000/users/${userId}/conversations`);
       if (!response.ok) {
         throw new Error('Failed to fetch conversations');
       }
