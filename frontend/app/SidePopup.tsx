@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import InputField from './InputField';
 import { useStore } from './store/useStore';
+import MarkdownRenderer from './MarkdownRenderer';
 import { API_URLS } from '../lib/api';
 
 interface Message {
@@ -328,9 +329,13 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
                     : 'bg-gray-100 text-gray-900'
                 }`}
               >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {message.content}
-                </p>
+                {message.role === 'assistant' ? (
+                  <MarkdownRenderer content={message.content} />
+                ) : (
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {message.content}
+                  </p>
+                )}
               </div>
             </div>
           ))}
@@ -417,9 +422,13 @@ export default function SidePopup({ isOpen, onClose, initialMessage, title = "Co
                   : 'bg-gray-100 text-gray-900'
               }`}
             >
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                {message.content}
-              </p>
+              {message.role === 'assistant' ? (
+                <MarkdownRenderer content={message.content} />
+              ) : (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                  {message.content}
+                </p>
+              )}
             </div>
           </div>
         ))}

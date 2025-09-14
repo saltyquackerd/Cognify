@@ -81,3 +81,205 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Markdown Content Styles */
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content h1:first-child,
+.markdown-content h2:first-child,
+.markdown-content h3:first-child,
+.markdown-content h4:first-child,
+.markdown-content h5:first-child,
+.markdown-content h6:first-child {
+  margin-top: 0;
+}
+
+.markdown-content p {
+  margin-bottom: 1rem;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content blockquote {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid #e5e7eb;
+  background-color: #f9fafb;
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.markdown-content code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875em;
+}
+
+.markdown-content pre {
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.markdown-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.markdown-content th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.markdown-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.markdown-content a:hover {
+  color: #1d4ed8;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 2rem 0;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+/* Task list styles */
+.markdown-content input[type="checkbox"] {
+  margin-right: 0.5rem;
+  accent-color: #2563eb;
+}
+
+/* Code highlighting overrides for better contrast */
+.markdown-content pre code.hljs {
+  background: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+.markdown-content pre code.hljs-comment,
+.markdown-content pre code.hljs-quote {
+  color: #9ca3af !important;
+}
+
+.markdown-content pre code.hljs-keyword,
+.markdown-content pre code.hljs-selector-tag,
+.markdown-content pre code.hljs-subst {
+  color: #f472b6 !important;
+}
+
+.markdown-content pre code.hljs-number,
+.markdown-content pre code.hljs-literal,
+.markdown-content pre code.hljs-variable,
+.markdown-content pre code.hljs-template-variable,
+.markdown-content pre code.hljs-tag .hljs-attr {
+  color: #60a5fa !important;
+}
+
+.markdown-content pre code.hljs-string,
+.markdown-content pre code.hljs-doctag {
+  color: #34d399 !important;
+}
+
+.markdown-content pre code.hljs-title,
+.markdown-content pre code.hljs-section,
+.markdown-content pre code.hljs-selector-id {
+  color: #fbbf24 !important;
+}
+
+.markdown-content pre code.hljs-type,
+.markdown-content pre code.hljs-class .hljs-title {
+  color: #a78bfa !important;
+}
+
+.markdown-content pre code.hljs-tag,
+.markdown-content pre code.hljs-name,
+.markdown-content pre code.hljs-attribute {
+  color: #fb7185 !important;
+}
+
+.markdown-content pre code.hljs-regexp,
+.markdown-content pre code.hljs-link {
+  color: #22d3ee !important;
+}
+
+.markdown-content pre code.hljs-symbol,
+.markdown-content pre code.hljs-bullet {
+  color: #fde047 !important;
+}
+
+.markdown-content pre code.hljs-built_in,
+.markdown-content pre code.hljs-builtin-name {
+  color: #a3a3a3 !important;
+}
+
+.markdown-content pre code.hljs-meta {
+  color: #6b7280 !important;
+}
+
+.markdown-content pre code.hljs-deletion {
+  background: #dc2626 !important;
+}
+
+.markdown-content pre code.hljs-addition {
+  background: #16a34a !important;
+}
+
+.markdown-content pre code.hljs-emphasis {
+  font-style: italic;
+}
+
+.markdown-content pre code.hljs-strong {
+  font-weight: bold;
+}

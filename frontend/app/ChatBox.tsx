@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import InputField from './InputField';
 import { useStore } from './store/useStore';
 import SidePopup from './SidePopup';
+import MarkdownRenderer from './MarkdownRenderer';
 import { API_URLS } from '../lib/api';
 
 interface Message {
@@ -493,9 +494,13 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                             : 'bg-white text-gray-900'
                         }`}
                       >
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {message.content}
-                        </p>
+                        {message.role === 'assistant' ? (
+                          <MarkdownRenderer content={message.content} />
+                        ) : (
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                            {message.content}
+                          </p>
+                        )}
                       </div>
                       
                       {/* Quiz Button - Only for assistant messages */}
