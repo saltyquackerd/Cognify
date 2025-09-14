@@ -66,24 +66,24 @@ class LLM():
         except requests.exceptions.RequestException as e:
             return f"Error communicating with Cerebras API: {str(e)}"
     
-    def generate_quiz_questions(self, response_text: str, user_highlight: str = None) -> str:
+    def generate_quiz_questions(self, response_text: str, user_highlight: str = None, conversation_history: List[Dict] = None,) -> str:
         """
         Generate a single long-answer question based on response text
         
         Args:
             response_text (str): Text to generate questions from
-            user_highlight
+            user_highlight (str): Text highlighted by the user to get quiz question on
+            coversation_history: Conversation history for context
             
         Returns:
             List[Dict]: List containing one long-answer question
         """
 
         system_prompt = """"You are a question writer.
-                            Write EXACTLY ONE long-answer question.
-                            PRIORITIZE HIGHLIGHTS that also appear in <CONTEXT>. 
-                            Stay 100% within <CONTEXT>; do not use outside knowledge or add new terms.
-                            Output must be ONLY the question text—no rationale, no preface, no JSON, no bullets.
-                            Max 55 words. No examples. No answers."""
+                            Write EXACTLY ONE brief long-answer question.
+                            If there are <HIGHLIGHTS>, prioritize <HIGHLIGHTS> appearing in <CONTEXT>
+                            Output must be related to <CONTEXT>—no rationale, no preface, no JSON, no bullets.
+                            No examples. No answers."""
 
         user_prompt = f"""<CONTEXT>
                         {response_text}
@@ -94,149 +94,111 @@ class LLM():
                         </HIGHLIGHTS>
 
                         Requirements:
-                        - Center the question on highlight terms that appear in <CONTEXT>.
-                        - Ask about relationships, mechanisms, trade-offs, or synthesis already present in <CONTEXT>.
-                        - Use ONLY terms that occur in <CONTEXT>.
+                        - Focus on relationships, trade-offs, mechanisms, synthesis, or other questions that test mastering of knowledge from the conversation history
                         """
         
-        conversation = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        conversation = conversation_history or list()
+
+        conversation.append({"role": "system", "content": system_prompt})
+        conversation.append({"role": "user", "content": user_prompt})
 
         return self.get_chat_response(system_prompt, conversation_history = conversation)
     
     def evaluate_answer(self, conversation_history : List[Dict], question: str, user_answer: str) -> str:
-        """
-        Returns evaluation of a long-answer response using LLM
-        """
-        prompt = f"""
-        You are an educational assessment AI. Please evaluate the following student's answer to a comprehension question.
+        # """
+        # Returns evaluation of a long-answer response using LLM
+        # """
+        # prompt = f"""
+        # You are an educational assessment AI. Please evaluate the following student's answer to a comprehension question.
 
-        ORIGINAL QUESTION:
-        {question}
+        # ORIGINAL QUESTION:
+        # {question}
 
-        SOURCE TEXT:
-        {source_text}
+        # SOURCE TEXT:
+        # {source_text}
 
-        STUDENT'S ANSWER:
-        {user_answer}
+        # STUDENT'S ANSWER:
+        # {user_answer}
 
-        Please provide:
-        1. A score from 0-100 based on accuracy, completeness, and understanding
-        2. Specific feedback on what they got right and what could be improved
-        3. An explanation of the key concepts they should have covered
+        # Please provide:
+        # 1. A score from 0-100 based on accuracy, completeness, and understanding
+        # 2. Specific feedback on what they got right and what could be improved
+        # 3. An explanation of the key concepts they should have covered
 
-        Format your response as:
-        SCORE: [0-100]
-        FEEDBACK: [detailed feedback]
-        EXPLANATION: [key concepts explanation]
-        """
+        # Format your response as:
+        # SCORE: [0-100]
+        # FEEDBACK: [detailed feedback]
+        # EXPLANATION: [key concepts explanation]
+        # """
         
-        judgment_response = self.get_chat_response(prompt)
+        # judgment_response = self.get_chat_response(prompt)
         
-        # Parse the response
-        lines = judgment_response.split('\n')
-        score = 0
-        feedback = ""
-        explanation = ""
+        # # Parse the response
+        # lines = judgment_response.split('\n')
+        # score = 0
+        # feedback = ""
+        # explanation = ""
         
-        for line in lines:
-            line = line.strip()
-            if line.startswith('SCORE:'):
-                try:
-                    score = int(line.replace('SCORE:', '').strip())
-                except:
-                    score = 50  # Default score if parsing fails
-            elif line.startswith('FEEDBACK:'):
-                feedback = line.replace('FEEDBACK:', '').strip()
-            elif line.startswith('EXPLANATION:'):
-                explanation = line.replace('EXPLANATION:', '').strip()
+        # for line in lines:
+        #     line = line.strip()
+        #     if line.startswith('SCORE:'):
+        #         try:
+        #             score = int(line.replace('SCORE:', '').strip())
+        #         except:
+        #             score = 50  # Default score if parsing fails
+        #     elif line.startswith('FEEDBACK:'):
+        #         feedback = line.replace('FEEDBACK:', '').strip()
+        #     elif line.startswith('EXPLANATION:'):
+        #         explanation = line.replace('EXPLANATION:', '').strip()
         
-        return {
-            "score": score,
-            "feedback": feedback,
-            "explanation": explanation,
-            "raw_judgment": judgment_response
-        }
+        # return {
+        #     "score": score,
+        #     "feedback": feedback,
+        #     "explanation": explanation,
+        #     "raw_judgment": judgment_response
+        # }
+
+        return 'eval in progress'
 
     def get_title(self, response : str):
         """
         Generates chat title from first LLM response in conversation history
         """
+        return response[:10]
 
 def main():
-    """Test all methods in the  class"""
-    print("=" * 60)
-    print("TESTING LLM SERVICE")
-    print("=" * 60)
-    
-    # Initialize the LLM service
     llm = LLM()
-    
-    # # Test 3: Basic chat response (if API key is configured)
-    # print("\n3. Testing Basic Chat Response:")
-    # print("-" * 30)
-    # test_message = "What is artificial intelligence?"
-    # print(f"Test message: '{test_message}'")
-    
-    # gen = llm.get_chat_response(test_message)
-    # for response in gen:
-    #     print(response,end='',flush=True)
-    
-    # # Test 4: Chat response with specific model
-    # print("\n4. Testing Chat Response with Specific Model:")
-    # print("-" * 30)
-    # specific_model = "llama3.1-8b"
-    # print(f"Using model: {specific_model}")
-    
-    # response_with_model = llm.get_chat_response(test_message, model=specific_model)
-    # history = ""
-    # for response in response_with_model:
-    #     history += response
-    #     print(response,end='',flush=True)
+    history = []
 
-    # # Test 4.5: Chat response with conversation history
-    # print("\n4.5 Testing Chat Response with Conversation History:")
-    # print("-" * 30)
+    message = "What are some graph algorithms?"
+    # message = "What is the probability of rolling two dice and getting a sum of 7?"
+    response = ""
+    gen = llm.get_chat_response(message)
+    for s in gen:
+        response += s
+        print(s,end='',flush=True)
     
-    # response_with_history = llm.get_chat_response('Why are these developments important?', conversation_history = [{'role':'user','content':test_message}, {'role':'assistant','content':history}])
-    # for response in response_with_history:
-    #     print(response,end='',flush=True)
-    
-    # Test 5: Generate simple quiz questions
-    print("\n5. Testing Simple Quiz Generation:")
-    print("-" * 30)
-    sample_text = "Artificial Intelligence (AI) is a branch of computer science that aims to create machines capable of intelligent behavior. Machine learning is a subset of AI that focuses on algorithms that can learn from data. Deep learning uses neural networks with multiple layers to process complex patterns."
-    print(f"Sample text: '{sample_text[:100]}...'")
-    
-    simple_quiz = llm.generate_quiz_questions(sample_text)
-    print(f"Generated simple quiz questions:")
-    for response in simple_quiz:
+    history.append({'role':'user','content':message})
+    history.append({'role':'assistant','content':response})
+
+    message = "I understand Dijkstra's, but I do not understand Bellman Ford"
+    # message = 'How about 8?'
+    response = ''
+    gen = llm.get_chat_response(message, conversation_history = history)
+    for s in gen:
+        response += s
+        print(s,end='',flush=True)
+
+    history.append({'role':'user','content':message})
+    history.append({'role':'assistant','content':response})
+
+    quiz_gen = llm.generate_quiz_questions(response, None, history)
+    for response in quiz_gen:
         print(response, end='',flush=True)
-    
-    # # Test 7: Error handling - test with empty message
-    # print("\n7. Testing Error Handling:")
-    # print("-" * 30)
-    # empty_response = llm.get_chat_response("")
-    # print(f"Empty message response: {empty_response}")
-    
-    # # Test 8: Edge cases for quiz generation
-    # print("\n8. Testing Edge Cases:")
-    # print("-" * 30)
-    
-    # # Test with very short text
-    # short_text = "AI is smart."
-    # short_quiz = llm.generate_quiz_questions(short_text, num_questions=5)
-    # print(f"Short text quiz (requested 5, got {len(short_quiz)}): {len(short_quiz)} questions")
-    
-    # # Test with empty text
-    # empty_quiz = llm.generate_quiz_questions("", num_questions=3)
-    # print(f"Empty text quiz: {len(empty_quiz)} questions")
-    
-    # print("\n" + "=" * 60)
-    # print("TESTING COMPLETE")
-    # print("=" * 60)
+
+    answers = ["It just makes the algorithm run faster.",
+                "Relaxing edges V-1 times ensures that all paths of length up to V−1 are considered, so the algorithm can update distances enough times to reach every vertex.",
+                "Relaxing edges V-1 times guarantees that the shortest paths—which can use at most V−1 edges—are fully propagated throughout the graph. This step ensures each vertex's distance reflects the true minimum cost from the source, enabling Bellman-Ford to correctly compute all shortest paths and later detect negative cycles."]
 
 
 if __name__ == "__main__":
