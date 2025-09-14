@@ -26,7 +26,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     // loadMessagesForConversation, // now triggered from store.selectConversation
     messagesByConversation,
     updateConversationLastMessage,
-    createNewConversation,
+    createOrSelectEmptyConversation,
     conversations
   } = useStore();
   
@@ -74,13 +74,15 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   console.log('ChatBox render - sidePopupOpen:', sidePopupOpen);
 
   const handleSendMessage = async (content: string) => {
+    console.log('handleSendMessage called with content:', content);
+    console.log('selectedConversationId:', selectedConversationId);
     let conversationId = selectedConversationId;
     
     // Create new conversation if none is selected
     if (!conversationId) {
       try {
-        console.log('Creating new conversation for user: 1');
-        const newConv = await createNewConversation('1');
+        console.log('Creating or selecting empty conversation for user: 1');
+        const newConv = await createOrSelectEmptyConversation('1');
         console.log('Successfully created conversation:', newConv);
         conversationId = newConv.id;
       } catch (error) {
@@ -114,7 +116,6 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
 
     try {
       // Send message to backend
-      console.log('Sending message to backend:', { message: content, session_id: conversationId });
       const response = await fetch('http://localhost:5000/api/chat', {
         method: 'POST',
         headers: {

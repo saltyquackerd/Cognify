@@ -60,9 +60,13 @@ class LLM():
                 stream=True
             )
         
+            # Collect the streamed response into a single string
+            response = ""
             for chunk in stream:
                 if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                    response += chunk.choices[0].delta.content
+            
+            return response
         except requests.exceptions.RequestException as e:
             return f"Error communicating with Cerebras API: {str(e)}"
     
