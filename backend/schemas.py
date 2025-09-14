@@ -78,13 +78,17 @@ class QuizSchema:
     def create_quiz_document(
         quiz_id: str, 
         session_id: str, 
-        user_id: str
+        user_id: str,
+        start_assistant_message_id: Dict,
+        prev_context: List[Dict]
     ) -> Dict:
         """Create a new quiz document matching session structure"""
         return {
             '_id': quiz_id,
             'session_id': session_id,
             'user_id': user_id,
+            'start_assistant_message_id': start_assistant_message_id,
+            'prev_context': prev_context,
             'created_at': datetime.now().isoformat(),
             'messages': [],
             'conversation_history': []

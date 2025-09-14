@@ -274,7 +274,7 @@ def chat():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def combine_session_and_quiz_history(session_messages, target_user_message, target_assistant_message, quiz_history=None):
+def combine_session_and_quiz_history(session_messages, start_user_message, quiz_history=None):
     """
     Combine session history up to the quiz point and add quiz history without overlap.
     
@@ -290,15 +290,15 @@ def combine_session_and_quiz_history(session_messages, target_user_message, targ
     combined_history = []
     
     # Find the index of the target user message in session messages by message_id
-    target_user_index = -1
+    start_user_index = -1
     for i, msg in enumerate(session_messages):
-        if msg.get('message_id') == target_user_message['message_id'] and msg.get('role') == 'user':
-            target_user_index = i
+        if msg.get('message_id') == start_user_message['message_id'] and msg.get('role') == 'user':
+            start_user_index = i
             break
     
     # Convert session messages to conversation history format before target user message
-    if target_user_index > 0:
-        for i in range(target_user_index):
+    if start_user_index > 0:
+        for i in range(start_user_index):
             msg = session_messages[i]
             combined_history.append({
                 "role": msg['role'],
@@ -353,6 +353,8 @@ def create_quiz_thread(session_id):
         
         if not start_user_message or not start_assistant_message:
             return jsonify({'error': 'Start messages not found'}), 404
+
+        prev_context = combine_session_and_quiz_history(messages, start_user_message, sessions[session_id]['conversation_history'])
         
         # Create new quiz thread
         quiz_id = str(uuid.uuid4())
@@ -360,6 +362,8 @@ def create_quiz_thread(session_id):
             'id': quiz_id,
             'session_id': session_id,
             'user_id': sessions[session_id]['user_id'],
+            'start_assistant_message': start_assistant_message,
+            'prev_context': prev_context,
             'created_at': datetime.now().isoformat(),
             'messages': [
                 {
@@ -439,33 +443,22 @@ def submit_quiz_answer(quiz_id):
 def ask_quiz_question(quiz_id):
     """Ask a question for a target assistant message"""
     try:
-        data = request.get_json()
-        assistant_message_id = data.get('assistant_message_id', '')
-        
         if quiz_id not in quizzes:
             return jsonify({'error': 'Quiz not found'}), 404
-        
-        if not assistant_message_id:
-            return jsonify({'error': 'assistant_message_id is required'}), 400
         
         quiz = quizzes[quiz_id]
         
         # Find the target assistant message in quiz messages
-        target_assistant_message = None
-        for i in range(len(quiz['messages']) - 1, -1, -1):
-            msg = quiz['messages'][i]
-            if msg['message_id'] == assistant_message_id and msg['role'] == 'assistant':
-                target_assistant_message = msg
-                break
+        target_assistant_message = quiz['start_assistant_message']
         
         if not target_assistant_message:
             return jsonify({'error': 'Target assistant message not found in quiz'}), 404
         
         # Generate quiz questions from the target assistant message
-        # combined_history = combine_session_and_quiz_history(quiz['messages'], start_quiz_message, quiz['conversation_history'])
+        combined_history = quiz['prev_context'] + quiz['conversation_history']
         quiz_questions_text = llm_service.generate_quiz_questions(
             target_assistant_message['message'], 
-            conversation_history=quiz['conversation_history']
+            conversation_history=combined_history
         )
         
         # Add quiz questions to both messages array and conversation history
