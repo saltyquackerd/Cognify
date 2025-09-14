@@ -414,6 +414,7 @@ def get_all_conversations(user_id):
             
             conversations.append({
                 'id': session_id,
+                'title': session_data.get('title', ''),
                 'lastMessage': last_message,
                 'timestamp': timestamp,
                 'isActive': False
