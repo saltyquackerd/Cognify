@@ -70,12 +70,12 @@ export default function MessageList() {
   };
 
   return (
-    <div className="flex flex-col h-full w-80 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex-shrink-0">
+    <div className="flex flex-col h-full w-80 bg-gray-50 border-r border-gray-200 flex-shrink-0">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-gray-200">
         <button
           onClick={handleNewChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300 font-medium"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 font-medium"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -95,7 +95,7 @@ export default function MessageList() {
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
           />
         </div>
       </div>
@@ -103,7 +103,7 @@ export default function MessageList() {
       {/* Conversations List */}
       <div className="flex-1 overflow-y-auto px-2 pb-4">
         {filteredConversations.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-gray-500">
             {searchQuery ? 'No conversations found' : 'No conversations yet'}
           </div>
         ) : (
@@ -113,8 +113,8 @@ export default function MessageList() {
                 key={conversation.id}
                 className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                   conversation.isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'hover:bg-gray-100'
                 }`}
                 onClick={() => handleSelectConversation(conversation.id)}
               >
@@ -130,19 +130,19 @@ export default function MessageList() {
                   <div className="flex items-center justify-between">
                     <h3 className={`text-sm font-medium truncate ${
                       conversation.isActive 
-                        ? 'text-blue-900 dark:text-blue-100' 
-                        : 'text-gray-900 dark:text-gray-100'
+                        ? 'text-blue-900' 
+                        : 'text-gray-900'
                     }`}>
                       {conversation.title}
                     </h3>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
+                    <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
                       {formatTimestamp(conversation.timestamp)}
                     </span>
                   </div>
                   <p className={`text-xs truncate mt-1 ${
                     conversation.isActive 
-                      ? 'text-blue-700 dark:text-blue-300' 
-                      : 'text-gray-600 dark:text-gray-400'
+                      ? 'text-blue-700' 
+                      : 'text-gray-600'
                   }`}>
                     {conversation.lastMessage}
                   </p>
@@ -151,7 +151,7 @@ export default function MessageList() {
                 {/* Delete Button */}
                 <button
                   onClick={(e) => handleDeleteClick(e, conversation.id)}
-                  className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1 rounded hover:bg-gray-200 transition-opacity"
                 >
                   <svg className="w-4 h-4 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -166,17 +166,17 @@ export default function MessageList() {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
               Delete conversation
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to delete this conversation? This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>

@@ -52,7 +52,7 @@ const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({
 
   return (
     <div className={`w-full p-4 ${sidePopupOpen ? 'max-w-2xl' : 'pr-16'}`}>
-      <div className="relative flex items-end bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-200">
+      <div className="relative flex items-end bg-white border border-gray-300 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-200">
       <textarea
         ref={inputRef}
           value={message}
@@ -61,7 +61,7 @@ const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none bg-transparent border-none outline-none px-4 py-3 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 text-base leading-6 max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600"
+          className="flex-1 resize-none bg-transparent border-none outline-none px-4 py-3 text-gray-900 placeholder-gray-500 text-base leading-6 max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300"
           style={{ minHeight: '24px' }}
         />
         
@@ -70,8 +70,8 @@ const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({
           disabled={!message.trim() || disabled}
           className={`m-2 p-2 rounded-lg transition-all duration-200 ${
             message.trim() && !disabled
-              ? 'bg-gray-900 dark:bg-white hover:bg-gray-700 dark:hover:bg-gray-200 text-white dark:text-gray-900 shadow-md hover:shadow-lg'
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              ? 'bg-gray-900 hover:bg-gray-700 text-white shadow-md hover:shadow-lg'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
           aria-label="Send message"
         >
@@ -95,7 +95,7 @@ const InputField = forwardRef<HTMLTextAreaElement, InputFieldProps>(({
       
       {/* Helper text */}
       {showInstructions && (
-        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+        <div className="mt-2 text-xs text-gray-500 text-center">
           Press Enter to send, Shift + Enter for new line
         </div>
       )}

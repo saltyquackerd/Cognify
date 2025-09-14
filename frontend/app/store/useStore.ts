@@ -95,7 +95,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   loadConversations: async (userId) => {
     try {
-      const response = await fetch('http://localhost:5000/api/conversations');
+      const response = await fetch(`http://localhost:5000/users/${userId}/conversations`);
       if (!response.ok) {
         throw new Error('Failed to fetch conversations');
       }
@@ -105,7 +105,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const transformedConversations = conversations.map((conv: any) => ({
         id: conv.id.toString(),
         title: conv.title || 'Untitled Conversation',
-        lastMessage: conv.last_message || '',
+        lastMessage: conv.lastMessage || '',
         timestamp: new Date(conv.created_at || conv.timestamp),
         isActive: false
       }));
