@@ -6,10 +6,8 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
-  // Disable server-side features that don't work with static export
-  experimental: {
-    esmExternals: false
-  }
+  // Remove experimental.esmExternals as it's not supported with Turbopack
+  // and not needed for static export
 };
 
 export default nextConfig;
