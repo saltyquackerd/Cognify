@@ -21,9 +21,10 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   const { 
     selectedConversation, 
     selectedConversationId, 
-    messages, 
     addMessage, 
     getMessagesForConversation,
+    // loadMessagesForConversation, // now triggered from store.selectConversation
+    messagesByConversation,
     updateConversationLastMessage
   } = useStore();
   
@@ -40,9 +41,6 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
   // Update current messages when conversation changes
   useEffect(() => {
     if (selectedConversationId) {
-      const conversationMessages = getMessagesForConversation(selectedConversationId);
-      setCurrentMessages(conversationMessages);
-      
       // Focus the input field when a conversation is selected
       setTimeout(() => {
         if (inputRef.current) {
@@ -52,7 +50,15 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     } else {
       setCurrentMessages([]);
     }
-  }, [selectedConversationId, messages, getMessagesForConversation]);
+  }, [selectedConversationId]);
+
+  // Update current messages when messagesByConversation changes
+  useEffect(() => {
+    if (selectedConversationId) {
+      const conversationMessages = messagesByConversation[selectedConversationId] || [];
+      setCurrentMessages(conversationMessages);
+    }
+  }, [selectedConversationId, messagesByConversation]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -79,19 +85,58 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
     updateConversationLastMessage(selectedConversationId, content);
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
+    try {
+      // Send message to backend
+      const response = await fetch('http://localhost:5000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: content,
+          session_id: selectedConversationId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      const data = await response.json();
+      
+      // Create assistant message from backend response
+      const assistantMessage: Message = {
+        id: data.chatbot_message_id || (Date.now() + 1).toString(),
+        content: data.chat_response,
+        role: 'assistant',
+        timestamp: new Date(),
+        conversationId: selectedConversationId,
+      };
+      
+      addMessage(assistantMessage);
+      updateConversationLastMessage(selectedConversationId, assistantMessage.content);
+      
+      // Update conversation title if it was generated
+      if (data.title && data.title !== 'New conversation') {
+        useStore.getState().updateConversation(selectedConversationId, { title: data.title });
+      }
+      
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Fallback to simulated response if backend fails
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I'm a multiline output, similar to chatgpt. this is used to test the popup aksdfhaksjdhfaksjdfh hihihiadjfasldjfhaksjdhfaldf asdjhflajksdhfalkjdshfalksdfj haskdjhalksdjfhalkjsdfhalksjdfha sdlafkjsdhlakjdhfalksjd hfalkjdsh falkjdfhalksjdh falksdj fhalsd kjfashld f.",
+        content: "I'm sorry, I'm having trouble connecting to the server. Please try again later.",
         role: 'assistant',
         timestamp: new Date(),
         conversationId: selectedConversationId,
       };
       addMessage(assistantMessage);
       updateConversationLastMessage(selectedConversationId, assistantMessage.content);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleOpenSidePopup = (message: string) => {
@@ -160,7 +205,9 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                       message.role === 'user' ? 'justify-end' : 'justify-start'
                     } group`}
                   >
-                    <div className="flex items-start space-x-2 max-w-[70%]">
+                    <div className={`flex max-w-[70%] ${
+                      message.role === 'assistant' ? 'flex-col items-start' : 'items-start space-x-2'
+                    }`}>
                       <div
                         className={`rounded-2xl px-4 py-3 ${
                           message.role === 'user'
@@ -177,7 +224,7 @@ export default function ChatBox({ sidePopupWidth = 384 }: ChatBoxProps) {
                       {message.role === 'assistant' && (
                         <button
                           onClick={() => handleOpenSidePopup(message.content)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600 self-end mt-1"
                           title="Continue this conversation in side panel"
                         >
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">

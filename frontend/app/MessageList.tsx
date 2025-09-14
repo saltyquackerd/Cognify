@@ -11,7 +11,8 @@ export default function MessageList() {
     addConversation, 
     selectConversation, 
     deleteConversation,
-    loadConversations
+    loadConversations,
+    createNewConversation
   } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -44,24 +45,27 @@ export default function MessageList() {
     setShowDeleteConfirm(conversationId);
   };
 
-  const handleNewChat = () => {
-    const newConversation = {
-      id: Date.now().toString(),
-      title: 'New conversation',
-      lastMessage: 'Start a new conversation...',
-      timestamp: new Date(),
-      isActive: true
-    };
-    addConversation(newConversation);
-    router.refresh();
+  const handleNewChat = async () => {
+    try {
+      await createNewConversation('1'); // Using user ID '1' for now
+    } catch (error) {
+      console.error('Failed to create new conversation:', error);
+      // Fallback to local creation if backend fails
+      const newConversation = {
+        id: Date.now().toString(),
+        title: 'New conversation',
+        lastMessage: 'Start a new conversation...',
+        timestamp: new Date(),
+        isActive: true
+      };
+      addConversation(newConversation);
+    }
   };
 
   const handleSelectConversation = (id: string) => {
     console.log('MessageList - Selecting conversation:', id);
     selectConversation(id);
     console.log('MessageList - After selectConversation, selectedConversationId:', useStore.getState().selectedConversationId);
-    // Force a re-render by refreshing the page
-    router.refresh();
   };
 
   const handleDeleteConfirm = (conversationId: string) => {

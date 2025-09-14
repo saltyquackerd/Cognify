@@ -21,8 +21,8 @@ interface StoreState {
   conversations: Conversation[];
   selectedConversationId: string | null;
   
-  // Messages
-  messages: Message[];
+  // Messages organized by conversation ID
+  messagesByConversation: Record<string, Message[]>;
   
   // Actions
   addConversation: (conversation: Conversation) => void;
@@ -31,9 +31,11 @@ interface StoreState {
   selectConversation: (id: string) => void;
   setConversations: (conversations: Conversation[]) => void;
   loadConversations: (userId: string) => Promise<void>;
+  loadMessagesForConversation: (conversationId: string) => Promise<void>;
+  createNewConversation: (userId: string) => Promise<Conversation>;
   
   addMessage: (message: Message) => void;
-  setMessages: (messages: Message[]) => void;
+  setMessagesForConversation: (conversationId: string, messages: Message[]) => void;
   getMessagesForConversation: (conversationId: string) => Message[];
   updateConversationLastMessage: (conversationId: string, lastMessage: string) => void;
   
@@ -46,7 +48,7 @@ export const useStore = create<StoreState>((set, get) => ({
   // Initial state
   conversations: [],
   selectedConversationId: null,
-  messages: [],
+  messagesByConversation: {},
 
   // Conversation actions
   addConversation: (conversation) => {
@@ -71,10 +73,13 @@ export const useStore = create<StoreState>((set, get) => ({
         ? (remaining.length > 0 ? remaining[0].id : null)
         : state.selectedConversationId;
       
+      // Remove messages for this conversation
+      const { [id]: deletedMessages, ...remainingMessages } = state.messagesByConversation;
+      
       return {
         conversations: remaining,
         selectedConversationId: newSelectedId,
-        messages: state.messages.filter(msg => msg.conversationId !== id)
+        messagesByConversation: remainingMessages
       };
     });
   },
@@ -87,6 +92,9 @@ export const useStore = create<StoreState>((set, get) => ({
         isActive: conv.id === id
       }))
     }));
+    
+    // Always load messages for the selected conversation
+    get().loadMessagesForConversation(id);
   },
 
   setConversations: (conversations) => {
@@ -95,7 +103,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
   loadConversations: async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/users/${userId}/conversations`);
+      const response = await fetch(`http://localhost:5000/api/users/${userId}/conversations`);
+      console.log(response);
       if (!response.ok) {
         throw new Error('Failed to fetch conversations');
       }
@@ -106,7 +115,7 @@ export const useStore = create<StoreState>((set, get) => ({
         id: conv.id.toString(),
         title: conv.title || 'Untitled Conversation',
         lastMessage: conv.lastMessage || '',
-        timestamp: new Date(conv.created_at || conv.timestamp),
+        timestamp: new Date(conv.timestamp),
         isActive: false
       }));
       
@@ -117,19 +126,96 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
+  loadMessagesForConversation: async (conversationId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/conversations/${conversationId}/messages`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch messages');
+      }
+      const messages = await response.json();
+      
+      // Transform the API response to match our Message interface
+      const transformedMessages = messages.map((msg: any) => ({
+        id: msg.id.toString(),
+        content: msg.content || '',
+        role: msg.role || 'user',
+        timestamp: new Date(msg.timestamp),
+        conversationId: msg.conversationId
+      }));
+      
+      set((state) => ({
+        messagesByConversation: {
+          ...state.messagesByConversation,
+          [conversationId]: transformedMessages
+        }
+      }));
+    } catch (error) {
+      console.error('Error loading messages for conversation:', conversationId, error);
+      // Keep existing messages if API fails
+    }
+  },
+
+  createNewConversation: async (userId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/${userId}/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create new conversation');
+      }
+      
+      const sessionData = await response.json();
+      
+      // Transform the API response to match our Conversation interface
+      const newConversation: Conversation = {
+        id: sessionData.session_id,
+        title: 'New conversation',
+        lastMessage: 'Start a new conversation...',
+        timestamp: new Date(sessionData.created_at),
+        isActive: true
+      };
+      
+      // Add the new conversation to the store
+      set((state) => ({
+        conversations: [newConversation, ...state.conversations.map(conv => ({ ...conv, isActive: false }))],
+        selectedConversationId: newConversation.id
+      }));
+      
+      return newConversation;
+    } catch (error) {
+      console.error('Error creating new conversation:', error);
+      throw error;
+    }
+  },
+
   // Message actions
   addMessage: (message) => {
     set((state) => ({
-      messages: [...state.messages, message]
+      messagesByConversation: {
+        ...state.messagesByConversation,
+        [message.conversationId]: [
+          ...(state.messagesByConversation[message.conversationId] || []),
+          message
+        ]
+      }
     }));
   },
 
-  setMessages: (messages) => {
-    set({ messages });
+  setMessagesForConversation: (conversationId, messages) => {
+    set((state) => ({
+      messagesByConversation: {
+        ...state.messagesByConversation,
+        [conversationId]: messages
+      }
+    }));
   },
 
   getMessagesForConversation: (conversationId) => {
-    return get().messages.filter(msg => msg.conversationId === conversationId);
+    return get().messagesByConversation[conversationId] || [];
   },
 
   updateConversationLastMessage: (conversationId, lastMessage) => {
